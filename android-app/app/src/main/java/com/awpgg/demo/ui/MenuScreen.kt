@@ -52,25 +52,26 @@ private val tabs = listOf("Visuals", "Combat", "Movement", "Misc", "Settings")
 fun MenuScreen(
     visible: Boolean,
     watermarkVisible: Boolean,
+    overlayMode: Boolean = false,
     onWatermarkChange: (Boolean) -> Unit,
     onMinimize: () -> Unit,
     onClose: () -> Unit,
     onShowMenu: () -> Unit,
     onDemoAction: (String) -> Unit
 ) {
+    val rootColor = if (overlayMode) Color.Transparent else Color(0xFF0A0A0C)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0A0C))
+            .background(rootColor)
     ) {
-        StarfieldBackground()
-
-        if (watermarkVisible) {
+        if (visible && watermarkVisible) {
             WatermarkHud()
         }
 
         if (!visible) {
-            ShowMenuChip(onClick = onShowMenu)
+            ShowMenuChip(onClick = onShowMenu, overlayMode = overlayMode)
         }
 
         if (visible) {
@@ -86,11 +87,15 @@ fun MenuScreen(
 }
 
 @Composable
-private fun ShowMenuChip(onClick: () -> Unit) {
+private fun ShowMenuChip(onClick: () -> Unit, overlayMode: Boolean) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier = if (overlayMode) {
+            Modifier.padding(8.dp)
+        } else {
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        },
         contentAlignment = Alignment.TopStart
     ) {
         Box(
@@ -131,7 +136,7 @@ private fun WatermarkHud() {
 }
 
 @Composable
-private fun StarfieldBackground() {
+private fun StarfieldBackground(modifier: Modifier = Modifier) {
     val stars = remember {
         List(60) {
             Star(
@@ -154,7 +159,7 @@ private fun StarfieldBackground() {
         label = "phase"
     )
 
-    Canvas(modifier = Modifier.fillMaxSize()) {
+    Canvas(modifier = modifier) {
         stars.forEach { star ->
             val x = ((star.x + phase * star.speed * 1000) % 1.1f) * size.width
             val y = ((star.y + phase * star.speed * 700) % 1.1f) * size.height
@@ -226,20 +231,29 @@ private fun DraggableMenuWindow(
 
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxWidth()
                     .padding(8.dp)
             ) {
-                when (selectedTab) {
-                    0 -> VisualsTab(onDemoAction)
-                    1 -> CombatTab(onDemoAction)
-                    2 -> MovementTab(onDemoAction)
-                    3 -> MiscTab(onDemoAction)
-                    4 -> SettingsTab(
-                        onDemoAction = onDemoAction,
-                        watermarkVisible = watermarkVisible,
-                        onWatermarkChange = onWatermarkChange,
-                        onClose = onClose
-                    )
+                StarfieldBackground(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(AwpColors.Bg)
+                )
+
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when (selectedTab) {
+                        0 -> VisualsTab(onDemoAction)
+                        1 -> CombatTab(onDemoAction)
+                        2 -> MovementTab(onDemoAction)
+                        3 -> MiscTab(onDemoAction)
+                        4 -> SettingsTab(
+                            onDemoAction = onDemoAction,
+                            watermarkVisible = watermarkVisible,
+                            onWatermarkChange = onWatermarkChange,
+                            onClose = onClose
+                        )
+                    }
                 }
             }
         }
