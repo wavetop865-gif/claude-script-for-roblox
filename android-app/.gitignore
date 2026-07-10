@@ -1,0 +1,8 @@
+*.iml
+.gradle/
+local.properties
+**/build/
+!awp-menu-demo.apk
+captures/
+.externalNativeBuild/
+.cxx/
