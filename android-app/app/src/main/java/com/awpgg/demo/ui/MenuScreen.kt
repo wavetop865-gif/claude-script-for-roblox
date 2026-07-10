@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -48,7 +51,15 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
-private val tabs = listOf("Visuals", "Combat", "Movement", "Misc", "Settings")
+private data class TabInfo(val name: String, val icon: String)
+
+private val tabs = listOf(
+    TabInfo("Visuals", "◉"),
+    TabInfo("Combat", "⌖"),
+    TabInfo("Movement", "➜"),
+    TabInfo("Misc", "✦"),
+    TabInfo("Settings", "⚙")
+)
 
 @Composable
 fun MenuScreen(
@@ -61,7 +72,7 @@ fun MenuScreen(
     onShowMenu: () -> Unit,
     onDemoAction: (String) -> Unit
 ) {
-    val rootColor = if (overlayMode) Color.Transparent else Color(0xFF0A0A0C)
+    val rootColor = if (overlayMode) Color.Transparent else Color(0xFF0A0A10)
 
     Box(
         modifier = Modifier
@@ -102,22 +113,24 @@ private fun ShowMenuChip(onClick: () -> Unit, overlayMode: Boolean) {
     ) {
         Row(
             modifier = Modifier
-                .clickable(onClick = onClick)
+                .clip(RoundedCornerShape(999.dp))
                 .background(AwpColors.BgPanel)
-                .border(1.dp, AwpColors.Stroke),
+                .border(1.dp, AwpColors.Stroke, RoundedCornerShape(999.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .width(3.dp)
-                    .height(32.dp)
-                    .background(AwpColors.Accent)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(AwpGradients.accent)
             )
+            Spacer(Modifier.width(8.dp))
             Text(
-                text = "awp.gg  |  tap to open",
+                text = "nova  |  открыть",
                 color = AwpColors.Text,
-                style = AwpTypography.label,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                style = AwpTypography.label
             )
         }
     }
@@ -133,21 +146,23 @@ private fun WatermarkHud() {
     ) {
         Row(
             modifier = Modifier
-                .background(AwpColors.BgPanel.copy(alpha = 0.9f))
-                .border(1.dp, AwpColors.Stroke),
+                .clip(RoundedCornerShape(999.dp))
+                .background(AwpColors.BgPanel.copy(alpha = 0.92f))
+                .border(1.dp, AwpColors.Stroke, RoundedCornerShape(999.dp))
+                .padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .width(3.dp)
-                    .height(24.dp)
-                    .background(AwpColors.Accent)
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(AwpGradients.accent)
             )
+            Spacer(Modifier.width(7.dp))
             Text(
-                text = "awp.gg  |  60 fps",
+                text = "nova  |  60 fps",
                 color = AwpColors.Text,
-                style = AwpTypography.caption,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                style = AwpTypography.caption
             )
         }
     }
@@ -155,6 +170,11 @@ private fun WatermarkHud() {
 
 @Composable
 private fun StarfieldBackground(modifier: Modifier = Modifier) {
+    val starColors = listOf(
+        Color.White,
+        AwpColors.AccentBright,
+        AwpColors.AccentAlt
+    )
     val stars = remember {
         List(50) {
             Star(
@@ -162,7 +182,8 @@ private fun StarfieldBackground(modifier: Modifier = Modifier) {
                 y = Random.nextFloat(),
                 size = if (Random.nextBoolean()) 1f else 2f,
                 speed = Random.nextFloat() * 0.0008f + 0.0002f,
-                alpha = Random.nextFloat() * 0.4f + 0.1f
+                alpha = Random.nextFloat() * 0.35f + 0.08f,
+                colorIndex = Random.nextInt(starColors.size)
             )
         }
     }
@@ -182,7 +203,7 @@ private fun StarfieldBackground(modifier: Modifier = Modifier) {
             val x = ((star.x + phase * star.speed * 1000) % 1.1f) * size.width
             val y = ((star.y + phase * star.speed * 700) % 1.1f) * size.height
             drawCircle(
-                color = Color.White.copy(alpha = star.alpha),
+                color = starColors[star.colorIndex].copy(alpha = star.alpha),
                 radius = star.size,
                 center = Offset(x.roundToInt() + 0.5f, y.roundToInt() + 0.5f)
             )
@@ -195,7 +216,8 @@ private data class Star(
     val y: Float,
     val size: Float,
     val speed: Float,
-    val alpha: Float
+    val alpha: Float,
+    val colorIndex: Int
 )
 
 @Composable
@@ -217,39 +239,39 @@ private fun MenuWindow(
         val density = LocalDensity.current
         val menuWidth = with(density) {
             val maxPx = maxWidth.roundToPx()
-            val targetPx = minOf(maxPx, 640.dp.roundToPx())
+            val targetPx = minOf(maxPx, 650.dp.roundToPx())
             (targetPx / density.density).dp
         }
-        val menuHeight = menuWidth * (370f / 640f)
+        val menuHeight = menuWidth * (375f / 650f)
 
-        Row(
+        Column(
             modifier = Modifier
                 .size(width = menuWidth, height = menuHeight)
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+                .clip(RoundedCornerShape(16.dp))
                 .background(AwpColors.Bg)
-                .border(1.dp, AwpColors.Stroke)
+                .border(1.dp, AwpColors.Stroke, RoundedCornerShape(16.dp))
         ) {
-            Sidebar(
-                selectedTab = selectedTab,
-                onTabSelect = { selectedTab = it }
+            TopBar(
+                onMinimize = onMinimize,
+                onClose = onClose,
+                onDrag = { dx, dy ->
+                    offsetX = (offsetX + dx).roundToInt().toFloat()
+                    offsetY = (offsetY + dy).roundToInt().toFloat()
+                }
             )
 
             Box(
                 modifier = Modifier
-                    .width(1.dp)
-                    .fillMaxHeight()
-                    .background(AwpColors.Stroke)
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(AwpGradients.accent)
             )
 
-            Column(modifier = Modifier.fillMaxSize()) {
-                ContentHeader(
-                    title = tabs[selectedTab],
-                    onMinimize = onMinimize,
-                    onClose = onClose,
-                    onDrag = { dx, dy ->
-                        offsetX = (offsetX + dx).roundToInt().toFloat()
-                        offsetY = (offsetY + dy).roundToInt().toFloat()
-                    }
+            Row(modifier = Modifier.fillMaxSize()) {
+                Sidebar(
+                    selectedTab = selectedTab,
+                    onTabSelect = { selectedTab = it }
                 )
 
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -262,7 +284,7 @@ private fun MenuWindow(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(10.dp)
+                            .padding(12.dp)
                     ) {
                         when (selectedTab) {
                             0 -> VisualsTab(onDemoAction)
@@ -284,66 +306,7 @@ private fun MenuWindow(
 }
 
 @Composable
-private fun Sidebar(
-    selectedTab: Int,
-    onTabSelect: (Int) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .width(118.dp)
-            .fillMaxHeight()
-            .background(AwpColors.BgPanel)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .padding(start = 15.dp),
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "awp.gg",
-                color = AwpColors.AccentBright,
-                style = AwpTypography.body.copy(fontWeight = FontWeight.Bold)
-            )
-            Text(
-                text = "DEMO BUILD",
-                color = AwpColors.TextMuted,
-                style = AwpTypography.caption.copy(letterSpacing = 1.2.sp)
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(AwpColors.Stroke)
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        tabs.forEachIndexed { index, name ->
-            SidebarTab(
-                name = name,
-                selected = selectedTab == index,
-                onClick = { onTabSelect(index) }
-            )
-        }
-
-        Spacer(Modifier.weight(1f))
-
-        Text(
-            text = "v1.0",
-            color = AwpColors.TextMuted,
-            style = AwpTypography.caption,
-            modifier = Modifier.padding(start = 15.dp, bottom = 10.dp)
-        )
-    }
-}
-
-@Composable
-private fun ContentHeader(
-    title: String,
+private fun TopBar(
     onMinimize: () -> Unit,
     onClose: () -> Unit,
     onDrag: (Float, Float) -> Unit
@@ -351,40 +314,102 @@ private fun ContentHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(32.dp)
-            .background(AwpColors.BgPanel)
+            .height(40.dp)
+            .background(AwpGradients.header)
             .pointerInput(Unit) {
                 detectDragGestures { change, drag ->
                     change.consume()
                     onDrag(drag.x, drag.y)
                 }
             }
-            .padding(start = 12.dp, end = 8.dp),
+            .padding(start = 14.dp, end = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(AwpGradients.accentVertical),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("N", color = Color.White, style = AwpTypography.caption.copy(fontWeight = FontWeight.Bold))
+        }
+        Spacer(Modifier.width(9.dp))
         Text(
-            text = title,
+            text = "nova",
             color = AwpColors.Text,
-            style = AwpTypography.label.copy(fontWeight = FontWeight.Bold),
-            modifier = Modifier.weight(1f)
+            style = AwpTypography.label.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp)
         )
-        HeaderButton("—", onMinimize)
-        Spacer(Modifier.width(4.dp))
-        HeaderButton("×", onClose)
+        Spacer(Modifier.width(6.dp))
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(5.dp))
+                .background(AwpColors.BgInput)
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Text("DEMO", color = AwpColors.AccentBright, fontSize = 9.sp)
+        }
+        Spacer(Modifier.weight(1f))
+        TopBarButton("—", AwpColors.TextDim, onMinimize)
+        Spacer(Modifier.width(6.dp))
+        TopBarButton("×", Color(0xFFE86A7A), onClose)
     }
 }
 
 @Composable
-private fun HeaderButton(symbol: String, onClick: () -> Unit) {
+private fun TopBarButton(symbol: String, color: Color, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(width = 24.dp, height = 20.dp)
-            .clickable(onClick = onClick)
+            .size(26.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(AwpColors.BgInput)
-            .border(1.dp, AwpColors.StrokeSoft),
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(symbol, color = AwpColors.TextDim, style = AwpTypography.label)
+        Text(symbol, color = color, style = AwpTypography.label)
+    }
+}
+
+@Composable
+private fun Sidebar(
+    selectedTab: Int,
+    onTabSelect: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(130.dp)
+            .fillMaxHeight()
+            .background(AwpColors.BgPanel)
+            .padding(vertical = 8.dp)
+    ) {
+        tabs.forEachIndexed { index, tab ->
+            SidebarTab(
+                name = tab.name,
+                icon = tab.icon,
+                selected = selectedTab == index,
+                onClick = { onTabSelect(index) }
+            )
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        Row(
+            modifier = Modifier.padding(start = 18.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF4ADE80))
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "v2.0",
+                color = AwpColors.TextMuted,
+                style = AwpTypography.caption
+            )
+        }
     }
 }
 
@@ -518,7 +543,7 @@ private fun MiscTab(onDemoAction: (String) -> Unit) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             SectionCard("Utility") {
                 DemoToggle("Anti-AFK", false) { onDemoAction("Demo: Anti-AFK = $it") }
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
                 DemoButton("Reset Character") {
                     onDemoAction("Demo: Reset Character — не работает в демо")
                 }
@@ -546,7 +571,7 @@ private fun SettingsTab(
         ) {
             SectionCard("UI") {
                 DemoKeybind("Toggle Menu", "Chip")
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
                 DemoButton("Unload Menu") {
                     onDemoAction("Demo: меню закрыто")
                     onClose()
@@ -561,10 +586,10 @@ private fun SettingsTab(
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             SectionCard("Info") {
-                DemoLabel("awp.gg v1.0 — Android Demo")
+                DemoLabel("nova v2.0 — Android Demo")
                 DemoLabel("UI only, no game features")
                 DemoLabel("Долгое нажатие — поднастройки")
-                DemoLabel("Тяните заголовок — перемещение")
+                DemoLabel("Тяните шапку — перемещение")
             }
         }
     }

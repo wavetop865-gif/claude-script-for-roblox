@@ -165,7 +165,7 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                "awp.gg overlay",
+                "Nova overlay",
                 NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
@@ -186,7 +186,7 @@ class OverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         )
 
         return NotificationCompat.Builder(this, channelId)
-            .setContentTitle("awp.gg Demo")
+            .setContentTitle("Nova Demo")
             .setContentText("Меню поверх других приложений")
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(openIntent)

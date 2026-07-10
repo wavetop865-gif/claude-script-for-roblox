@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,7 +41,7 @@ fun PermissionScreen(
             .padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("awp.gg Demo", style = AwpTypography.title, color = AwpColors.Text)
+        Text("nova", style = AwpTypography.title, color = AwpColors.AccentBright)
         Spacer(Modifier.height(6.dp))
         Text(
             "Перед запуском нужны разрешения",
@@ -116,8 +118,9 @@ private fun PermissionCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
             .background(AwpColors.BgSection)
-            .border(1.dp, borderColor)
+            .border(1.dp, borderColor, RoundedCornerShape(12.dp))
             .padding(14.dp)
     ) {
         Row(
@@ -147,8 +150,9 @@ private fun StatusBadge(granted: Boolean, skipped: Boolean) {
     Box(
         modifier = Modifier
             .size(22.dp)
+            .clip(RoundedCornerShape(7.dp))
             .background(AwpColors.BgInput)
-            .border(1.dp, AwpColors.StrokeSoft),
+            .border(1.dp, AwpColors.StrokeSoft, RoundedCornerShape(7.dp)),
         contentAlignment = Alignment.Center
     ) {
         Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold)

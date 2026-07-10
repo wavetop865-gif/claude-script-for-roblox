@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
@@ -11,19 +12,36 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
+// "Nova" design language: deep space dark + violet-to-cyan gradient accent,
+// rounded surfaces, pill controls.
 object AwpColors {
-    val Bg = Color(0xFF161618)
-    val BgPanel = Color(0xFF101012)
-    val BgSection = Color(0xFF1A1A1C)
-    val BgInput = Color(0xFF202022)
-    val Stroke = Color(0xFF2E2E32)
-    val StrokeSoft = Color(0xFF26262A)
-    val Accent = Color(0xFFD2D2D7)
-    val AccentBright = Color(0xFFF5F5FA)
-    val AccentDim = Color(0xFF5F5F64)
-    val Text = Color(0xFFDCDCE0)
-    val TextDim = Color(0xFF96969E)
-    val TextMuted = Color(0xFF696970)
+    val Bg = Color(0xFF0E0E16)
+    val BgPanel = Color(0xFF13131D)
+    val BgSection = Color(0xFF181826)
+    val BgInput = Color(0xFF212132)
+    val Stroke = Color(0xFF2C2C42)
+    val StrokeSoft = Color(0xFF232336)
+
+    val Accent = Color(0xFF8B5CF6)
+    val AccentAlt = Color(0xFF22D3EE)
+    val AccentBright = Color(0xFFB79CFF)
+    val AccentDim = Color(0xFF5B3FA8)
+
+    val Text = Color(0xFFE9E9F4)
+    val TextDim = Color(0xFF9C9CB2)
+    val TextMuted = Color(0xFF60607A)
+}
+
+object AwpGradients {
+    val accent = Brush.horizontalGradient(
+        listOf(AwpColors.Accent, AwpColors.AccentAlt)
+    )
+    val accentVertical = Brush.verticalGradient(
+        listOf(AwpColors.Accent, AwpColors.AccentAlt)
+    )
+    val header = Brush.horizontalGradient(
+        listOf(Color(0xFF191929), Color(0xFF13131D))
+    )
 }
 
 private val CrispText = PlatformTextStyle(includeFontPadding = false)
@@ -69,7 +87,7 @@ private val DarkScheme = darkColorScheme(
     onBackground = AwpColors.Text,
     onSurface = AwpColors.Text,
     primary = AwpColors.Accent,
-    onPrimary = AwpColors.BgPanel,
+    onPrimary = Color.White,
     outline = AwpColors.Stroke
 )
 
