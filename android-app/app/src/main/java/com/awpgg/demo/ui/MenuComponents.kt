@@ -59,9 +59,10 @@ fun SectionCard(
         Text(
             text = title.uppercase(),
             color = AwpColors.TextMuted,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp,
+            style = AwpTypography.caption.copy(
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp
+            ),
             modifier = Modifier.padding(bottom = 6.dp)
         )
         content()
@@ -103,7 +104,7 @@ fun DemoToggle(
             Text(
                 text = label,
                 color = if (checked) AwpColors.Text else AwpColors.TextDim,
-                fontSize = 12.sp,
+                style = AwpTypography.label,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
@@ -145,7 +146,7 @@ private fun ToggleSwitch(checked: Boolean) {
         Box(
             modifier = Modifier
                 .size(12.dp)
-                .offset(x = if (checked) 20.dp else 2.dp, y = 1.dp)
+                .offset(x = if (checked) 20.dp else 2.dp, y = 2.dp)
                 .background(thumbColor)
         )
     }
@@ -164,8 +165,8 @@ fun DemoSlider(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(label, color = AwpColors.TextDim, fontSize = 12.sp)
-            Text(display(value), color = AwpColors.Accent, fontSize = 12.sp)
+            Text(label, color = AwpColors.TextDim, style = AwpTypography.label)
+            Text(display(value), color = AwpColors.Accent, style = AwpTypography.label)
         }
         Slider(
             value = value,
@@ -181,12 +182,17 @@ fun DemoSlider(
 }
 
 @Composable
-fun DemoButton(label: String, onClick: () -> Unit) {
+fun DemoButton(label: String, enabled: Boolean = true, onClick: () -> Unit) {
     var pressed by remember { mutableStateOf(false) }
     val bg by animateColorAsState(
-        if (pressed) AwpColors.BgInput else AwpColors.BgSection,
+        when {
+            !enabled -> AwpColors.BgPanel
+            pressed -> AwpColors.BgInput
+            else -> AwpColors.BgSection
+        },
         label = "btn"
     )
+    val textColor = if (enabled) AwpColors.Text else AwpColors.TextMuted
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -194,6 +200,7 @@ fun DemoButton(label: String, onClick: () -> Unit) {
             .background(bg)
             .border(1.dp, AwpColors.StrokeSoft)
             .clickable(
+                enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
@@ -203,7 +210,7 @@ fun DemoButton(label: String, onClick: () -> Unit) {
             },
         contentAlignment = Alignment.Center
     ) {
-        Text(label, color = AwpColors.Text, fontSize = 12.sp)
+        Text(label, color = textColor, style = AwpTypography.label)
     }
 }
 
@@ -212,7 +219,7 @@ fun DemoLabel(text: String, color: Color = AwpColors.TextDim) {
     Text(
         text = text,
         color = color,
-        fontSize = 11.sp,
+        style = AwpTypography.caption,
         modifier = Modifier.padding(vertical = 3.dp)
     )
 }
@@ -226,8 +233,8 @@ fun DemoKeybind(label: String, keyText: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, color = AwpColors.TextDim, fontSize = 12.sp)
-        Text("[$keyText]", color = AwpColors.Accent, fontSize = 12.sp)
+        Text(label, color = AwpColors.TextDim, style = AwpTypography.label)
+        Text("[$keyText]", color = AwpColors.Accent, style = AwpTypography.label)
     }
 }
 
@@ -254,8 +261,9 @@ fun TabButton(
         Text(
             text = name,
             color = if (selected) AwpColors.AccentBright else AwpColors.TextDim,
-            fontSize = 12.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+            style = AwpTypography.label.copy(
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+            )
         )
     }
 }

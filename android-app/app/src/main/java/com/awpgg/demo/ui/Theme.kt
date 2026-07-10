@@ -1,9 +1,15 @@
 package com.awpgg.demo.ui
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 
 object AwpColors {
     val Bg = Color(0xFF161618)
@@ -20,6 +26,43 @@ object AwpColors {
     val TextMuted = Color(0xFF696970)
 }
 
+private val CrispText = PlatformTextStyle(includeFontPadding = false)
+
+object AwpTypography {
+    val title = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Bold,
+        fontSize = 22.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.sp,
+        platformStyle = CrispText
+    )
+    val body = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 14.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.sp,
+        platformStyle = CrispText
+    )
+    val label = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+        lineHeight = 14.sp,
+        letterSpacing = 0.sp,
+        platformStyle = CrispText
+    )
+    val caption = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 11.sp,
+        lineHeight = 13.sp,
+        letterSpacing = 0.sp,
+        platformStyle = CrispText
+    )
+}
+
 private val DarkScheme = darkColorScheme(
     background = AwpColors.Bg,
     surface = AwpColors.BgSection,
@@ -30,10 +73,17 @@ private val DarkScheme = darkColorScheme(
     outline = AwpColors.Stroke
 )
 
+private val AwpMaterialTypography = Typography(
+    bodyMedium = AwpTypography.body,
+    labelMedium = AwpTypography.label,
+    titleMedium = AwpTypography.title
+)
+
 @Composable
 fun AwpTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = DarkScheme,
+        typography = AwpMaterialTypography,
         content = content
     )
 }

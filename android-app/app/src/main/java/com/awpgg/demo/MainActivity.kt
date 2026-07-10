@@ -10,110 +10,111 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.app.NotificationManagerCompat
-import com.awpgg.demo.ui.AwpColors
 import com.awpgg.demo.ui.AwpTheme
-import com.awpgg.demo.ui.DemoButton
+import com.awpgg.demo.ui.PermissionScreen
 
 class MainActivity : ComponentActivity() {
 
-    private var permissionRequested by mutableStateOf(false)
+    private var refreshTick by mutableIntStateOf(0)
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) {
+            Toast.makeText(
+                this,
+                "Без уведомлений меню может закрыться системой",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+        refreshPermissions()
+        requestNextMissingPermission()
+    }
 
     private val overlayPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        if (Settings.canDrawOverlays(this)) {
-            startOverlay()
-        } else {
-            Toast.makeText(this, "Нужно разрешение «Поверх других приложений»", Toast.LENGTH_LONG).show()
+        refreshPermissions()
+        if (!Settings.canDrawOverlays(this)) {
+            Toast.makeText(
+                this,
+                "Включите «Разрешить поверх других приложений»",
+                Toast.LENGTH_LONG
+            ).show()
         }
-    }
-
-    private val notificationPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { _ ->
-        requestOverlayPermissionIfNeeded()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        renderPermissionScreen()
+    }
 
-        if (Settings.canDrawOverlays(this)) {
-            startOverlay()
-            return
-        }
+    override fun onResume() {
+        super.onResume()
+        refreshPermissions()
+    }
 
+    private fun refreshPermissions() {
+        refreshTick++
+    }
+
+    private fun renderPermissionScreen() {
         setContent {
             AwpTheme {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFF0A0A0C))
-                        .padding(24.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text("awp.gg Demo", color = AwpColors.Text, fontSize = 22.sp)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Меню откроется поверх других приложений",
-                        color = AwpColors.TextDim,
-                        fontSize = 14.sp
-                    )
-                    Spacer(Modifier.height(24.dp))
-                    DemoButton("Запустить меню") {
-                        requestOverlayPermissionIfNeeded()
-                    }
-                    if (permissionRequested) {
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "Включите «Разрешить поверх других приложений»",
-                            color = AwpColors.TextMuted,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
+                val tick = refreshTick
+                val status = Permissions.status(this@MainActivity)
+                // tick forces re-read after returning from system settings
+                @Suppress("UNUSED_VARIABLE")
+                val forceRefresh = tick
+
+                PermissionScreen(
+                    status = status,
+                    onRequestNotifications = { requestNotifications() },
+                    onRequestOverlay = { requestOverlay() },
+                    onStartMenu = { startOverlayIfReady() }
+                )
             }
         }
     }
 
-    private fun requestOverlayPermissionIfNeeded() {
-        permissionRequested = true
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            !NotificationManagerCompat.from(this).areNotificationsEnabled()
-        ) {
+    private fun requestNotifications() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun requestOverlay() {
+        if (Settings.canDrawOverlays(this)) {
+            refreshPermissions()
             return
         }
-        if (!Settings.canDrawOverlays(this)) {
-            val intent = Intent(
+        overlayPermissionLauncher.launch(
+            Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:$packageName")
             )
-            overlayPermissionLauncher.launch(intent)
-            return
-        }
-        startOverlay()
+        )
     }
 
-    private fun startOverlay() {
+    private fun requestNextMissingPermission() {
+        val status = Permissions.status(this)
+        when {
+            status.needsNotifications -> requestNotifications()
+            !status.overlayGranted -> requestOverlay()
+        }
+    }
+
+    private fun startOverlayIfReady() {
+        val status = Permissions.status(this)
+        if (!status.allGranted) {
+            requestNextMissingPermission()
+            Toast.makeText(this, "Сначала выдайте все разрешения", Toast.LENGTH_SHORT).show()
+            return
+        }
         OverlayService.start(this)
         Toast.makeText(this, "Меню запущено поверх экрана", Toast.LENGTH_SHORT).show()
         moveTaskToBack(true)

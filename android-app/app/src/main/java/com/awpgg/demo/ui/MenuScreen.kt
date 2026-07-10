@@ -34,15 +34,16 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -109,7 +110,7 @@ private fun ShowMenuChip(onClick: () -> Unit, overlayMode: Boolean) {
             Text(
                 text = "awp.gg  |  tap to open",
                 color = AwpColors.Text,
-                fontSize = 12.sp
+                style = AwpTypography.label
             )
         }
     }
@@ -126,7 +127,7 @@ private fun WatermarkHud() {
         Text(
             text = "awp.gg  |  60 fps",
             color = AwpColors.Text,
-            fontSize = 12.sp,
+            style = AwpTypography.label,
             modifier = Modifier
                 .background(AwpColors.BgPanel.copy(alpha = 0.85f))
                 .border(1.dp, AwpColors.Stroke)
@@ -166,7 +167,7 @@ private fun StarfieldBackground(modifier: Modifier = Modifier) {
             drawCircle(
                 color = Color.White.copy(alpha = star.alpha),
                 radius = star.size,
-                center = Offset(x, y)
+                center = Offset(x.roundToInt() + 0.5f, y.roundToInt() + 0.5f)
             )
         }
     }
@@ -192,23 +193,31 @@ private fun DraggableMenuWindow(
     var offsetY by remember { mutableFloatStateOf(0f) }
     var selectedTab by remember { mutableIntStateOf(0) }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
+        val density = LocalDensity.current
+        val menuWidth = with(density) {
+            val maxPx = maxWidth.roundToPx()
+            val targetPx = minOf(maxPx, 620.dp.roundToPx())
+            (targetPx / density.density).dp
+        }
+        val menuHeight = menuWidth * (360f / 620f)
+
         Column(
             modifier = Modifier
-                .size(width = 620.dp, height = 360.dp)
+                .size(width = menuWidth, height = menuHeight)
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
                 .background(AwpColors.Bg)
-                .border(1.dp, AwpColors.Stroke.copy(alpha = 0.9f))
+                .border(1.dp, AwpColors.Stroke)
         ) {
             TitleBar(
                 onMinimize = onMinimize,
                 onClose = onClose,
                 onDrag = { dx, dy ->
-                    offsetX += dx
-                    offsetY += dy
+                    offsetX = (offsetX + dx).roundToInt().toFloat()
+                    offsetY = (offsetY + dy).roundToInt().toFloat()
                 }
             )
 
@@ -284,14 +293,13 @@ private fun TitleBar(
         Text(
             text = "awp.gg",
             color = AwpColors.Text,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
+            style = AwpTypography.label.copy(fontWeight = FontWeight.Bold),
             modifier = Modifier.weight(1f)
         )
         Text(
             text = "DEMO",
             color = AwpColors.TextMuted,
-            fontSize = 10.sp,
+            style = AwpTypography.caption,
             modifier = Modifier.padding(end = 8.dp)
         )
         TitleButton("—", onMinimize)
@@ -310,7 +318,7 @@ private fun TitleButton(symbol: String, onClick: () -> Unit) {
             .border(1.dp, AwpColors.StrokeSoft),
         contentAlignment = Alignment.Center
     ) {
-        Text(symbol, color = AwpColors.TextDim, fontSize = 12.sp)
+        Text(symbol, color = AwpColors.TextDim, style = AwpTypography.label)
     }
 }
 
