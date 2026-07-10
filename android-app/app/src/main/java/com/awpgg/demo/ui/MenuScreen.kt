@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,7 +35,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -76,7 +77,7 @@ fun MenuScreen(
         }
 
         if (visible) {
-            DraggableMenuWindow(
+            MenuWindow(
                 onMinimize = onMinimize,
                 onClose = onClose,
                 onDemoAction = onDemoAction,
@@ -99,18 +100,24 @@ private fun ShowMenuChip(onClick: () -> Unit, overlayMode: Boolean) {
         },
         contentAlignment = Alignment.TopStart
     ) {
-        Box(
+        Row(
             modifier = Modifier
                 .clickable(onClick = onClick)
                 .background(AwpColors.BgPanel)
-                .border(1.dp, AwpColors.Stroke)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            contentAlignment = Alignment.Center
+                .border(1.dp, AwpColors.Stroke),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(32.dp)
+                    .background(AwpColors.Accent)
+            )
             Text(
                 text = "awp.gg  |  tap to open",
                 color = AwpColors.Text,
-                style = AwpTypography.label
+                style = AwpTypography.label,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
             )
         }
     }
@@ -124,28 +131,38 @@ private fun WatermarkHud() {
             .padding(12.dp),
         contentAlignment = Alignment.TopEnd
     ) {
-        Text(
-            text = "awp.gg  |  60 fps",
-            color = AwpColors.Text,
-            style = AwpTypography.label,
+        Row(
             modifier = Modifier
-                .background(AwpColors.BgPanel.copy(alpha = 0.85f))
-                .border(1.dp, AwpColors.Stroke)
-                .padding(horizontal = 10.dp, vertical = 4.dp)
-        )
+                .background(AwpColors.BgPanel.copy(alpha = 0.9f))
+                .border(1.dp, AwpColors.Stroke),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(24.dp)
+                    .background(AwpColors.Accent)
+            )
+            Text(
+                text = "awp.gg  |  60 fps",
+                color = AwpColors.Text,
+                style = AwpTypography.caption,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+            )
+        }
     }
 }
 
 @Composable
 private fun StarfieldBackground(modifier: Modifier = Modifier) {
     val stars = remember {
-        List(60) {
+        List(50) {
             Star(
                 x = Random.nextFloat(),
                 y = Random.nextFloat(),
                 size = if (Random.nextBoolean()) 1f else 2f,
                 speed = Random.nextFloat() * 0.0008f + 0.0002f,
-                alpha = Random.nextFloat() * 0.5f + 0.2f
+                alpha = Random.nextFloat() * 0.4f + 0.1f
             )
         }
     }
@@ -182,7 +199,7 @@ private data class Star(
 )
 
 @Composable
-private fun DraggableMenuWindow(
+private fun MenuWindow(
     onMinimize: () -> Unit,
     onClose: () -> Unit,
     onDemoAction: (String) -> Unit,
@@ -200,68 +217,65 @@ private fun DraggableMenuWindow(
         val density = LocalDensity.current
         val menuWidth = with(density) {
             val maxPx = maxWidth.roundToPx()
-            val targetPx = minOf(maxPx, 620.dp.roundToPx())
+            val targetPx = minOf(maxPx, 640.dp.roundToPx())
             (targetPx / density.density).dp
         }
-        val menuHeight = menuWidth * (360f / 620f)
+        val menuHeight = menuWidth * (370f / 640f)
 
-        Column(
+        Row(
             modifier = Modifier
                 .size(width = menuWidth, height = menuHeight)
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
                 .background(AwpColors.Bg)
                 .border(1.dp, AwpColors.Stroke)
         ) {
-            TitleBar(
-                onMinimize = onMinimize,
-                onClose = onClose,
-                onDrag = { dx, dy ->
-                    offsetX = (offsetX + dx).roundToInt().toFloat()
-                    offsetY = (offsetY + dy).roundToInt().toFloat()
-                }
+            Sidebar(
+                selectedTab = selectedTab,
+                onTabSelect = { selectedTab = it }
             )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(AwpColors.BgPanel)
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                tabs.forEachIndexed { index, name ->
-                    TabButton(
-                        name = name,
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
 
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(8.dp)
-            ) {
-                StarfieldBackground(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(AwpColors.Bg)
+                    .width(1.dp)
+                    .fillMaxHeight()
+                    .background(AwpColors.Stroke)
+            )
+
+            Column(modifier = Modifier.fillMaxSize()) {
+                ContentHeader(
+                    title = tabs[selectedTab],
+                    onMinimize = onMinimize,
+                    onClose = onClose,
+                    onDrag = { dx, dy ->
+                        offsetX = (offsetX + dx).roundToInt().toFloat()
+                        offsetY = (offsetY + dy).roundToInt().toFloat()
+                    }
                 )
 
                 Box(modifier = Modifier.fillMaxSize()) {
-                    when (selectedTab) {
-                        0 -> VisualsTab(onDemoAction)
-                        1 -> CombatTab(onDemoAction)
-                        2 -> MovementTab(onDemoAction)
-                        3 -> MiscTab(onDemoAction)
-                        4 -> SettingsTab(
-                            onDemoAction = onDemoAction,
-                            watermarkVisible = watermarkVisible,
-                            onWatermarkChange = onWatermarkChange,
-                            onClose = onClose
-                        )
+                    StarfieldBackground(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(AwpColors.Bg)
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(10.dp)
+                    ) {
+                        when (selectedTab) {
+                            0 -> VisualsTab(onDemoAction)
+                            1 -> CombatTab(onDemoAction)
+                            2 -> MovementTab(onDemoAction)
+                            3 -> MiscTab(onDemoAction)
+                            4 -> SettingsTab(
+                                onDemoAction = onDemoAction,
+                                watermarkVisible = watermarkVisible,
+                                onWatermarkChange = onWatermarkChange,
+                                onClose = onClose
+                            )
+                        }
                     }
                 }
             }
@@ -270,7 +284,66 @@ private fun DraggableMenuWindow(
 }
 
 @Composable
-private fun TitleBar(
+private fun Sidebar(
+    selectedTab: Int,
+    onTabSelect: (Int) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .width(118.dp)
+            .fillMaxHeight()
+            .background(AwpColors.BgPanel)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .padding(start = 15.dp),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "awp.gg",
+                color = AwpColors.AccentBright,
+                style = AwpTypography.body.copy(fontWeight = FontWeight.Bold)
+            )
+            Text(
+                text = "DEMO BUILD",
+                color = AwpColors.TextMuted,
+                style = AwpTypography.caption.copy(letterSpacing = 1.2.sp)
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(AwpColors.Stroke)
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        tabs.forEachIndexed { index, name ->
+            SidebarTab(
+                name = name,
+                selected = selectedTab == index,
+                onClick = { onTabSelect(index) }
+            )
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        Text(
+            text = "v1.0",
+            color = AwpColors.TextMuted,
+            style = AwpTypography.caption,
+            modifier = Modifier.padding(start = 15.dp, bottom = 10.dp)
+        )
+    }
+}
+
+@Composable
+private fun ContentHeader(
+    title: String,
     onMinimize: () -> Unit,
     onClose: () -> Unit,
     onDrag: (Float, Float) -> Unit
@@ -278,43 +351,36 @@ private fun TitleBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(28.dp)
+            .height(32.dp)
             .background(AwpColors.BgPanel)
-            .border(1.dp, AwpColors.Stroke.copy(alpha = 0.5f))
             .pointerInput(Unit) {
                 detectDragGestures { change, drag ->
                     change.consume()
                     onDrag(drag.x, drag.y)
                 }
             }
-            .padding(horizontal = 10.dp),
+            .padding(start = 12.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "awp.gg",
+            text = title,
             color = AwpColors.Text,
             style = AwpTypography.label.copy(fontWeight = FontWeight.Bold),
             modifier = Modifier.weight(1f)
         )
-        Text(
-            text = "DEMO",
-            color = AwpColors.TextMuted,
-            style = AwpTypography.caption,
-            modifier = Modifier.padding(end = 8.dp)
-        )
-        TitleButton("—", onMinimize)
+        HeaderButton("—", onMinimize)
         Spacer(Modifier.width(4.dp))
-        TitleButton("×", onClose)
+        HeaderButton("×", onClose)
     }
 }
 
 @Composable
-private fun TitleButton(symbol: String, onClick: () -> Unit) {
+private fun HeaderButton(symbol: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(width = 22.dp, height = 20.dp)
+            .size(width = 24.dp, height = 20.dp)
             .clickable(onClick = onClick)
-            .background(AwpColors.BgInput.copy(alpha = 0.6f))
+            .background(AwpColors.BgInput)
             .border(1.dp, AwpColors.StrokeSoft),
         contentAlignment = Alignment.Center
     ) {
@@ -336,11 +402,11 @@ private fun VisualsTab(onDemoAction: (String) -> Unit) {
 
     Row(
         modifier = Modifier.fillMaxSize(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             SectionCard("Player ESP") {
                 listOf(
@@ -354,7 +420,7 @@ private fun VisualsTab(onDemoAction: (String) -> Unit) {
         }
         Column(
             Modifier.weight(1f).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             SectionCard("Filters") {
                 DemoToggle("Team Check", bool("Team Check")) { setBool("Team Check", it) }
@@ -362,7 +428,6 @@ private fun VisualsTab(onDemoAction: (String) -> Unit) {
                 DemoToggle("Show Self", bool("Show Self")) { setBool("Show Self", it) }
                 DemoSlider("Max Distance", maxDistance, 50f..5000f, onValueChange = {
                     maxDistance = it
-                    onDemoAction("Demo: Max Distance = ${it.roundToInt()}")
                 })
             }
             SectionCard("World") {
@@ -370,14 +435,12 @@ private fun VisualsTab(onDemoAction: (String) -> Unit) {
                 DemoToggle("No Fog", bool("No Fog")) { setBool("No Fog", it) }
                 DemoSlider("Camera FOV", cameraFov, 70f..120f, onValueChange = {
                     cameraFov = it
-                    onDemoAction("Demo: Camera FOV = ${it.roundToInt()}")
                 })
             }
             SectionCard("Crosshair") {
                 DemoToggle("Enabled", bool("Crosshair")) { setBool("Crosshair", it) }
                 DemoSlider("Size", crosshairSize, 2f..30f, onValueChange = {
                     crosshairSize = it
-                    onDemoAction("Demo: Crosshair Size = ${it.roundToInt()}")
                 })
             }
         }
@@ -393,7 +456,7 @@ private fun CombatTab(onDemoAction: (String) -> Unit) {
     var triggerDelay by remember { mutableFloatStateOf(50f) }
     var triggerCd by remember { mutableFloatStateOf(80f) }
 
-    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             SectionCard("Aimbot") {
                 DemoToggle("Aimbot", aimbot, onCheckedChange = { aimbot = it; onDemoAction("Demo: Aimbot = $it") }, subContent = {
@@ -426,7 +489,7 @@ private fun MovementTab(onDemoAction: (String) -> Unit) {
     var walkSpeed by remember { mutableFloatStateOf(16f) }
     var jumpPower by remember { mutableFloatStateOf(50f) }
 
-    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             SectionCard("Movement") {
                 DemoToggle("Infinite Jump", false) { onDemoAction("Demo: Infinite Jump = $it") }
@@ -438,21 +501,12 @@ private fun MovementTab(onDemoAction: (String) -> Unit) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             SectionCard("Speed") {
                 DemoToggle("Speed Boost", false, onCheckedChange = { onDemoAction("Demo: Speed Boost = $it") }, subContent = {
-                    DemoSlider("Walk Speed", walkSpeed, 16f..500f, onValueChange = {
-                        walkSpeed = it
-                        onDemoAction("Demo: Walk Speed = ${it.roundToInt()}")
-                    })
+                    DemoSlider("Walk Speed", walkSpeed, 16f..500f, onValueChange = { walkSpeed = it })
                 })
                 DemoToggle("Jump Boost", false, onCheckedChange = { onDemoAction("Demo: Jump Boost = $it") }, subContent = {
-                    DemoSlider("Jump Power", jumpPower, 50f..500f, onValueChange = {
-                        jumpPower = it
-                        onDemoAction("Demo: Jump Power = ${it.roundToInt()}")
-                    })
+                    DemoSlider("Jump Power", jumpPower, 50f..500f, onValueChange = { jumpPower = it })
                 })
-                DemoSlider("Fly Speed", flySpeed, 10f..300f, onValueChange = {
-                    flySpeed = it
-                    onDemoAction("Demo: Fly Speed = ${it.roundToInt()}")
-                })
+                DemoSlider("Fly Speed", flySpeed, 10f..300f, onValueChange = { flySpeed = it })
             }
         }
     }
@@ -460,18 +514,21 @@ private fun MovementTab(onDemoAction: (String) -> Unit) {
 
 @Composable
 private fun MiscTab(onDemoAction: (String) -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        SectionCard("Utility", Modifier.fillMaxWidth(0.5f)) {
-            DemoToggle("Anti-AFK", false) { onDemoAction("Demo: Anti-AFK = $it") }
-            Spacer(Modifier.height(4.dp))
-            DemoButton("Reset Character") {
-                onDemoAction("Demo: Reset Character — не работает в демо")
-            }
-            Spacer(Modifier.height(4.dp))
-            DemoButton("Rejoin Server") {
-                onDemoAction("Demo: Rejoin Server — не работает в демо")
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            SectionCard("Utility") {
+                DemoToggle("Anti-AFK", false) { onDemoAction("Demo: Anti-AFK = $it") }
+                Spacer(Modifier.height(6.dp))
+                DemoButton("Reset Character") {
+                    onDemoAction("Demo: Reset Character — не работает в демо")
+                }
+                Spacer(Modifier.height(6.dp))
+                DemoButton("Rejoin Server") {
+                    onDemoAction("Demo: Rejoin Server — не работает в демо")
+                }
             }
         }
+        Column(Modifier.weight(1f)) {}
     }
 }
 
@@ -482,13 +539,16 @@ private fun SettingsTab(
     onWatermarkChange: (Boolean) -> Unit,
     onClose: () -> Unit
 ) {
-    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             SectionCard("UI") {
-                DemoKeybind("Toggle Menu", "Volume Down")
-                Spacer(Modifier.height(4.dp))
+                DemoKeybind("Toggle Menu", "Chip")
+                Spacer(Modifier.height(6.dp))
                 DemoButton("Unload Menu") {
-                    onDemoAction("Demo: меню скрыто")
+                    onDemoAction("Demo: меню закрыто")
                     onClose()
                 }
             }
@@ -503,8 +563,8 @@ private fun SettingsTab(
             SectionCard("Info") {
                 DemoLabel("awp.gg v1.0 — Android Demo")
                 DemoLabel("UI only, no game features")
-                DemoLabel("Long-press toggle for sub-settings")
-                DemoLabel("Drag title bar to move menu")
+                DemoLabel("Долгое нажатие — поднастройки")
+                DemoLabel("Тяните заголовок — перемещение")
             }
         }
     }

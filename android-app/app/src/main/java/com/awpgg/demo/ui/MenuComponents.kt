@@ -4,7 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -13,27 +13,19 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -51,21 +43,41 @@ fun SectionCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(0.dp))
             .background(AwpColors.BgSection)
             .border(1.dp, AwpColors.StrokeSoft)
-            .padding(8.dp)
     ) {
-        Text(
-            text = title.uppercase(),
-            color = AwpColors.TextMuted,
-            style = AwpTypography.caption.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.8.sp
-            ),
-            modifier = Modifier.padding(bottom = 6.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(26.dp)
+                .background(AwpColors.BgPanel),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(12.dp)
+                    .background(AwpColors.Accent)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = title.uppercase(),
+                color = AwpColors.Text,
+                style = AwpTypography.caption.copy(
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp
+                )
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(AwpColors.StrokeSoft)
         )
-        content()
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+            content()
+        }
     }
 }
 
@@ -91,16 +103,17 @@ fun DemoToggle(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(28.dp)
+                .height(26.dp)
                 .pointerInput(subContent) {
                     detectTapGestures(
                         onTap = { onCheckedChange(!checked) },
                         onLongPress = { if (subContent != null) expanded = !expanded }
                     )
                 },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            CheckBox(checked = checked)
+            Spacer(Modifier.width(8.dp))
             Text(
                 text = label,
                 color = if (checked) AwpColors.Text else AwpColors.TextDim,
@@ -109,15 +122,22 @@ fun DemoToggle(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            ToggleSwitch(checked = checked)
+            if (subContent != null) {
+                Text(
+                    text = if (expanded) "▾" else "▸",
+                    color = AwpColors.TextMuted,
+                    fontSize = 10.sp
+                )
+            }
         }
         if (expanded && subContent != null) {
             Column(
                 modifier = Modifier
-                    .padding(start = 10.dp, top = 4.dp, bottom = 4.dp)
-                    .border(1.dp, AwpColors.StrokeSoft, RoundedCornerShape(0.dp))
+                    .fillMaxWidth()
+                    .padding(start = 22.dp, top = 2.dp, bottom = 6.dp)
                     .background(AwpColors.BgInput)
-                    .padding(6.dp)
+                    .border(1.dp, AwpColors.StrokeSoft)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 subContent()
             }
@@ -126,28 +146,26 @@ fun DemoToggle(
 }
 
 @Composable
-private fun ToggleSwitch(checked: Boolean) {
-    val trackColor by animateColorAsState(
-        if (checked) AwpColors.Accent else AwpColors.BgInput,
-        label = "track"
+private fun CheckBox(checked: Boolean) {
+    val fillColor by animateColorAsState(
+        if (checked) AwpColors.Accent else Color.Transparent,
+        label = "checkFill"
     )
-    val thumbColor by animateColorAsState(
-        if (checked) AwpColors.BgPanel else AwpColors.AccentDim,
-        label = "thumb"
+    val borderColor by animateColorAsState(
+        if (checked) AwpColors.Accent else AwpColors.Stroke,
+        label = "checkBorder"
     )
     Box(
         modifier = Modifier
-            .width(34.dp)
-            .height(16.dp)
-            .clip(RoundedCornerShape(0.dp))
-            .background(trackColor)
-            .border(1.dp, AwpColors.Stroke)
+            .size(14.dp)
+            .background(AwpColors.BgInput)
+            .border(1.dp, borderColor),
+        contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .size(12.dp)
-                .offset(x = if (checked) 20.dp else 2.dp, y = 2.dp)
-                .background(thumbColor)
+                .size(8.dp)
+                .background(fillColor)
         )
     }
 }
@@ -160,24 +178,61 @@ fun DemoSlider(
     onValueChange: (Float) -> Unit,
     display: (Float) -> String = { it.roundToInt().toString() }
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+    val range = valueRange.endInclusive - valueRange.start
+    val fraction = if (range > 0f) {
+        ((value - valueRange.start) / range).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(label, color = AwpColors.TextDim, style = AwpTypography.label)
-            Text(display(value), color = AwpColors.Accent, style = AwpTypography.label)
+            Text(display(value), color = AwpColors.AccentBright, style = AwpTypography.label)
         }
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = valueRange,
-            colors = SliderDefaults.colors(
-                thumbColor = AwpColors.AccentBright,
-                activeTrackColor = AwpColors.Accent,
-                inactiveTrackColor = AwpColors.BgInput
+        Spacer(Modifier.height(5.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(14.dp)
+                .pointerInput(valueRange) {
+                    detectTapGestures { offset ->
+                        val frac = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                        onValueChange(valueRange.start + frac * range)
+                    }
+                }
+                .pointerInput(valueRange) {
+                    detectHorizontalDragGestures { change, _ ->
+                        change.consume()
+                        val frac = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                        onValueChange(valueRange.start + frac * range)
+                    }
+                },
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .background(AwpColors.BgInput)
+                    .border(1.dp, AwpColors.StrokeSoft)
             )
-        )
+            if (fraction > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction)
+                        .height(6.dp)
+                        .background(AwpColors.Accent)
+                )
+            }
+        }
     }
 }
 
@@ -198,7 +253,7 @@ fun DemoButton(label: String, enabled: Boolean = true, onClick: () -> Unit) {
             .fillMaxWidth()
             .height(28.dp)
             .background(bg)
-            .border(1.dp, AwpColors.StrokeSoft)
+            .border(1.dp, if (enabled) AwpColors.Stroke else AwpColors.StrokeSoft)
             .clickable(
                 enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
@@ -229,35 +284,51 @@ fun DemoKeybind(label: String, keyText: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(28.dp),
+            .height(26.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(label, color = AwpColors.TextDim, style = AwpTypography.label)
-        Text("[$keyText]", color = AwpColors.Accent, style = AwpTypography.label)
+        Box(
+            modifier = Modifier
+                .background(AwpColors.BgInput)
+                .border(1.dp, AwpColors.Stroke)
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+        ) {
+            Text(keyText, color = AwpColors.AccentBright, style = AwpTypography.caption)
+        }
     }
 }
 
 @Composable
-fun TabButton(
+fun SidebarTab(
     name: String,
     selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onClick: () -> Unit
 ) {
     val bg by animateColorAsState(
-        if (selected) AwpColors.BgInput else AwpColors.BgSection,
-        label = "tab"
+        if (selected) AwpColors.BgSection else Color.Transparent,
+        label = "sideTab"
     )
-    Box(
-        modifier = modifier
-            .height(28.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(34.dp)
             .background(bg)
-            .border(1.dp, if (selected) AwpColors.AccentDim else AwpColors.StrokeSoft)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.Center
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .fillMaxHeight()
+                .background(if (selected) AwpColors.Accent else Color.Transparent)
+        )
+        Spacer(Modifier.width(12.dp))
         Text(
             text = name,
             color = if (selected) AwpColors.AccentBright else AwpColors.TextDim,
