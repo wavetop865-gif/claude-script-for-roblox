@@ -46,9 +46,15 @@ data class VpnUiState(
 object PulseVpn {
     private const val PREFS = "pulse_warp"
     private const val TUNNEL_NAME = "pulse-warp"
-    private const val API = "https://api.cloudflareclient.com/v0a1922"
+    // Несколько URL — на случай блокировок в РФ
+    private val API_BASES = listOf(
+        "https://api.cloudflareclient.com/v0a1922",
+        "https://api.cloudflareclient.com/v0a2470",
+    )
 
-    private val _state = MutableStateFlow(VpnUiState())
+    private val _state = MutableStateFlow(
+        VpnUiState(message = "Серверы уже встроены · интернет для списка не нужен")
+    )
     val state: StateFlow<VpnUiState> = _state.asStateFlow()
 
     @Volatile private var backend: GoBackend? = null
@@ -80,7 +86,12 @@ object PulseVpn {
 
     suspend fun connect(context: Context, endpointOverride: String? = null) = withContext(Dispatchers.IO) {
         try {
-            _state.value = VpnUiState(VpnPhase.Preparing, "Получение бесплатного сервера…")
+            val hasCache = !prefs(context).getString("wg_conf", null).isNullOrBlank()
+            _state.value = VpnUiState(
+                VpnPhase.Preparing,
+                if (hasCache) "Подключение к выбранному серверу…"
+                else "Первый запуск · создание ключей…"
+            )
             var confText = ensureWarpConfig(context)
             if (!endpointOverride.isNullOrBlank()) {
                 confText = confText.replace(
@@ -95,7 +106,7 @@ object PulseVpn {
 
             _state.value = VpnUiState(
                 phase = VpnPhase.Connecting,
-                message = "Подключение к VPN…",
+                message = "Установка туннеля…",
                 endpoint = endpoint,
                 address = address,
             )
@@ -111,7 +122,7 @@ object PulseVpn {
         } catch (e: Exception) {
             _state.value = VpnUiState(
                 phase = VpnPhase.Error,
-                message = e.message?.take(120) ?: "Ошибка подключения"
+                message = e.message?.take(140) ?: "Ошибка подключения"
             )
         }
     }
@@ -156,15 +167,71 @@ object PulseVpn {
             .put("key", publicKey)
             .put("fcm_token", "")
             .put("type", "Android")
-            .put("locale", "en_US")
+            .put("locale", "ru_RU")
             .toString()
 
-        val conn = (URL("$API/reg").openConnection() as HttpURLConnection).apply {
+        var lastError: Exception? = null
+        for (base in API_BASES) {
+            repeat(2) { attempt ->
+                try {
+                    val raw = postJson("$base/reg", body)
+                    val json = JSONObject(raw)
+                    val cfg = json.getJSONObject("config")
+                    val iface = cfg.getJSONObject("interface").getJSONObject("addresses")
+                    val peer = cfg.getJSONArray("peers").getJSONObject(0)
+                    val endpointHost = peer.getJSONObject("endpoint").optString("host")
+                        .ifBlank { "engage.cloudflareclient.com:2408" }
+                    val endpoint = if (endpointHost.contains(":")) endpointHost
+                    else "$endpointHost:2408"
+
+                    val v4 = iface.getString("v4")
+                    val v6 = iface.optString("v6")
+                    val addressLine = if (v6.isNullOrBlank()) "$v4/32" else "$v4/32, $v6/128"
+
+                    val conf = buildString {
+                        appendLine("[Interface]")
+                        appendLine("PrivateKey = $privateKey")
+                        appendLine("Address = $addressLine")
+                        appendLine("DNS = 1.1.1.1, 8.8.8.8")
+                        appendLine("MTU = 1280")
+                        appendLine()
+                        appendLine("[Peer]")
+                        appendLine("PublicKey = ${peer.getString("public_key")}")
+                        appendLine("AllowedIPs = 0.0.0.0/0, ::/0")
+                        appendLine("Endpoint = $endpoint")
+                        appendLine("PersistentKeepalive = 25")
+                    }
+
+                    p.edit()
+                        .putString("wg_conf", conf)
+                        .putString("device_id", json.optString("id"))
+                        .putString("token", json.optString("token"))
+                        .apply()
+
+                    return conf
+                } catch (e: Exception) {
+                    lastError = e
+                    try {
+                        Thread.sleep(400L * (attempt + 1))
+                    } catch (_: InterruptedException) {
+                    }
+                }
+            }
+        }
+        throw IllegalStateException(
+            "Не удалось создать VPN-ключ. Проверьте интернет и попробуйте снова. " +
+                "(${lastError?.message ?: "нет ответа"})"
+        )
+    }
+
+    private fun postJson(urlStr: String, body: String): String {
+        val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
-            connectTimeout = 20000
-            readTimeout = 20000
+            connectTimeout = 25000
+            readTimeout = 25000
             doOutput = true
             setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+            setRequestProperty("Accept", "application/json")
             setRequestProperty("User-Agent", "okhttp/3.12.1")
         }
         try {
@@ -172,44 +239,8 @@ object PulseVpn {
             val code = conn.responseCode
             val stream = if (code in 200..299) conn.inputStream else conn.errorStream
             val raw = BufferedReader(InputStreamReader(stream, StandardCharsets.UTF_8)).use { it.readText() }
-            if (code !in 200..299) throw IllegalStateException("WARP API HTTP $code")
-
-            val json = JSONObject(raw)
-            val cfg = json.getJSONObject("config")
-            val iface = cfg.getJSONObject("interface").getJSONObject("addresses")
-            val peer = cfg.getJSONArray("peers").getJSONObject(0)
-            val endpointHost = peer.getJSONObject("endpoint").optString("host")
-                .ifBlank { "engage.cloudflareclient.com:2408" }
-            // host may already include port; WARP sometimes returns :0 on v4 — prefer host field
-            val endpoint = if (endpointHost.contains(":")) endpointHost
-            else "$endpointHost:2408"
-
-            val v4 = iface.getString("v4")
-            val v6 = iface.optString("v6")
-            val addressLine = if (v6.isNullOrBlank()) "$v4/32" else "$v4/32, $v6/128"
-
-            val conf = buildString {
-                appendLine("[Interface]")
-                appendLine("PrivateKey = $privateKey")
-                appendLine("Address = $addressLine")
-                appendLine("DNS = 1.1.1.1")
-                appendLine("MTU = 1280")
-                appendLine()
-                appendLine("[Peer]")
-                appendLine("PublicKey = ${peer.getString("public_key")}")
-                appendLine("AllowedIPs = 0.0.0.0/0, ::/0")
-                appendLine("Endpoint = $endpoint")
-                // Keep connection alive through NATs
-                appendLine("PersistentKeepalive = 25")
-            }
-
-            p.edit()
-                .putString("wg_conf", conf)
-                .putString("device_id", json.optString("id"))
-                .putString("token", json.optString("token"))
-                .apply()
-
-            return conf
+            if (code !in 200..299) throw IllegalStateException("HTTP $code")
+            return raw
         } finally {
             conn.disconnect()
         }

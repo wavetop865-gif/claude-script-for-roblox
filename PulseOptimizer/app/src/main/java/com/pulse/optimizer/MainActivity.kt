@@ -418,7 +418,7 @@ fun VpnScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val vpnState by PulseVpn.state.collectAsState()
-    var selected by remember { mutableStateOf(FreeVpnServers.all.last()) }
+    var selected by remember { mutableStateOf(FreeVpnServers.all.first()) }
     var pendingConnect by remember { mutableStateOf(false) }
 
     val vpnPermissionLauncher = rememberLauncherForActivityResult(
@@ -466,9 +466,16 @@ fun VpnScreen() {
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            "Встроенный VPN · без других приложений",
+            "Серверы уже встроены · загрузка из сети не нужна",
+            color = NeonMint,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            "Выберите сервер и нажмите Подключить",
             color = TextSecondary,
-            fontSize = 13.sp
+            fontSize = 12.sp
         )
 
         Spacer(Modifier.height(20.dp))
@@ -566,10 +573,10 @@ fun VpnScreen() {
 
         Spacer(Modifier.height(18.dp))
         Text(
-            "БЕСПЛАТНЫЕ СЕРВЕРЫ",
+            "СЕРВЕРЫ (${FreeVpnServers.all.size}) · ВШИТЫ В ПРИЛОЖЕНИЕ",
             color = TextSecondary,
             fontSize = 11.sp,
-            letterSpacing = 2.sp,
+            letterSpacing = 1.5.sp,
             fontWeight = FontWeight.Medium
         )
         Spacer(Modifier.height(10.dp))
@@ -631,7 +638,7 @@ private fun FreeServerRow(
 }
 
 private fun countryFlag(code: String): String {
-    if (code.length != 2) return "🌐"
+    if (code.length != 2 || code == "UN" || code == "CF") return "🌐"
     val c = code.uppercase()
     val first = Character.codePointAt(c, 0) - 0x41 + 0x1F1E6
     val second = Character.codePointAt(c, 1) - 0x41 + 0x1F1E6

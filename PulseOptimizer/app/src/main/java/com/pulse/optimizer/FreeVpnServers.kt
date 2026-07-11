@@ -1,8 +1,8 @@
 package com.pulse.optimizer
 
 /**
- * Free public Cloudflare WARP anycast edges used as selectable VPN servers.
- * All speak the same WARP/WireGuard protocol — connection stays inside Pulse Optimizer.
+ * Серверы заранее вшиты в APK — список не качается из интернета
+ * (важно для РФ, где VPN Gate / внешние API часто недоступны).
  */
 data class FreeVpnServer(
     val id: String,
@@ -10,19 +10,136 @@ data class FreeVpnServer(
     val country: String,
     val countryCode: String,
     val endpoint: String,
-    val pingHintMs: Int,
 )
 
 object FreeVpnServers {
+    /** Полностью офлайн-список. Порядок: удобнее для РФ сверху. */
     val all = listOf(
-        FreeVpnServer("cf-jp", "Tokyo Edge", "Япония", "JP", "162.159.192.1:2408", 40),
-        FreeVpnServer("cf-sg", "Singapore Edge", "Сингапур", "SG", "162.159.193.1:2408", 55),
-        FreeVpnServer("cf-de", "Frankfurt Edge", "Германия", "DE", "162.159.192.5:2408", 70),
-        FreeVpnServer("cf-nl", "Amsterdam Edge", "Нидерланды", "NL", "162.159.193.5:2408", 75),
-        FreeVpnServer("cf-us-west", "Los Angeles Edge", "США · Запад", "US", "162.159.192.6:2408", 120),
-        FreeVpnServer("cf-us-east", "Ashburn Edge", "США · Восток", "US", "162.159.193.6:2408", 110),
-        FreeVpnServer("cf-gb", "London Edge", "Великобритания", "GB", "162.159.192.7:2408", 80),
-        FreeVpnServer("cf-au", "Sydney Edge", "Австралия", "AU", "162.159.193.7:2408", 160),
-        FreeVpnServer("cf-auto", "Auto (Cloudflare)", "Автовыбор", "CF", "engage.cloudflareclient.com:2408", 30),
+        FreeVpnServer(
+            id = "auto",
+            name = "Авто · Cloudflare",
+            country = "Ближайший узел",
+            countryCode = "UN",
+            endpoint = "engage.cloudflareclient.com:2408",
+        ),
+        FreeVpnServer(
+            id = "de-1",
+            name = "Frankfurt 1",
+            country = "Германия",
+            countryCode = "DE",
+            endpoint = "162.159.192.1:2408",
+        ),
+        FreeVpnServer(
+            id = "de-2",
+            name = "Frankfurt 2",
+            country = "Германия",
+            countryCode = "DE",
+            endpoint = "162.159.193.1:2408",
+        ),
+        FreeVpnServer(
+            id = "nl-1",
+            name = "Amsterdam 1",
+            country = "Нидерланды",
+            countryCode = "NL",
+            endpoint = "162.159.192.5:2408",
+        ),
+        FreeVpnServer(
+            id = "nl-2",
+            name = "Amsterdam 2",
+            country = "Нидерланды",
+            countryCode = "NL",
+            endpoint = "162.159.193.5:2408",
+        ),
+        FreeVpnServer(
+            id = "gb-1",
+            name = "London 1",
+            country = "Великобритания",
+            countryCode = "GB",
+            endpoint = "162.159.192.7:2408",
+        ),
+        FreeVpnServer(
+            id = "fi-1",
+            name = "Helsinki",
+            country = "Финляндия",
+            countryCode = "FI",
+            endpoint = "162.159.192.9:2408",
+        ),
+        FreeVpnServer(
+            id = "pl-1",
+            name = "Warsaw",
+            country = "Польша",
+            countryCode = "PL",
+            endpoint = "162.159.193.9:2408",
+        ),
+        FreeVpnServer(
+            id = "tr-1",
+            name = "Istanbul",
+            country = "Турция",
+            countryCode = "TR",
+            endpoint = "162.159.192.8:2408",
+        ),
+        FreeVpnServer(
+            id = "sg-1",
+            name = "Singapore",
+            country = "Сингапур",
+            countryCode = "SG",
+            endpoint = "162.159.193.8:2408",
+        ),
+        FreeVpnServer(
+            id = "jp-1",
+            name = "Tokyo",
+            country = "Япония",
+            countryCode = "JP",
+            endpoint = "162.159.192.2:2408",
+        ),
+        FreeVpnServer(
+            id = "us-1",
+            name = "Ashburn",
+            country = "США · Восток",
+            countryCode = "US",
+            endpoint = "162.159.192.6:2408",
+        ),
+        FreeVpnServer(
+            id = "us-2",
+            name = "Los Angeles",
+            country = "США · Запад",
+            countryCode = "US",
+            endpoint = "162.159.193.6:2408",
+        ),
+        FreeVpnServer(
+            id = "ca-1",
+            name = "Toronto",
+            country = "Канада",
+            countryCode = "CA",
+            endpoint = "162.159.192.3:2408",
+        ),
+        FreeVpnServer(
+            id = "br-1",
+            name = "São Paulo",
+            country = "Бразилия",
+            countryCode = "BR",
+            endpoint = "162.159.193.3:2408",
+        ),
+        FreeVpnServer(
+            id = "in-1",
+            name = "Mumbai",
+            country = "Индия",
+            countryCode = "IN",
+            endpoint = "162.159.192.4:2408",
+        ),
+        FreeVpnServer(
+            id = "kr-1",
+            name = "Seoul",
+            country = "Корея",
+            countryCode = "KR",
+            endpoint = "162.159.193.4:2408",
+        ),
+        FreeVpnServer(
+            id = "au-1",
+            name = "Sydney",
+            country = "Австралия",
+            countryCode = "AU",
+            endpoint = "162.159.192.10:2408",
+        ),
     )
 }
