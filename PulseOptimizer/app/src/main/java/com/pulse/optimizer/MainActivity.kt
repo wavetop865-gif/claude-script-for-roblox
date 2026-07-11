@@ -2,8 +2,10 @@ package com.pulse.optimizer
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.EaseInOutSine
 import androidx.compose.animation.core.LinearEasing
@@ -16,7 +18,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,7 +44,6 @@ import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Public
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.VpnKey
@@ -54,6 +54,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -416,29 +417,35 @@ private fun MethodButton(
 fun VpnScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var servers by remember { mutableStateOf<List<VpnServer>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var selected by remember { mutableStateOf<VpnServer?>(null) }
-    var status by remember { mutableStateOf("Бесплатные серверы VPN Gate") }
+    val vpnState by PulseVpn.state.collectAsState()
+    var selected by remember { mutableStateOf(FreeVpnServers.all.last()) }
+    var pendingConnect by remember { mutableStateOf(false) }
 
-    fun reload() {
-        loading = true
-        error = null
-        scope.launch {
-            try {
-                servers = VpnGateApi.fetchServers()
-                status = "Найдено ${servers.size} бесплатных серверов"
-            } catch (e: Exception) {
-                error = e.message ?: "Ошибка загрузки"
-                status = "Не удалось загрузить список"
-            } finally {
-                loading = false
-            }
+    val vpnPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK && pendingConnect) {
+            pendingConnect = false
+            scope.launch { PulseVpn.connect(context, selected.endpoint) }
+        } else {
+            pendingConnect = false
         }
     }
 
-    LaunchedEffect(Unit) { reload() }
+    fun requestConnect() {
+        val prepare = PulseVpn.prepareIntent(context)
+        if (prepare != null) {
+            pendingConnect = true
+            vpnPermissionLauncher.launch(prepare)
+        } else {
+            scope.launch { PulseVpn.connect(context, selected.endpoint) }
+        }
+    }
+
+    val busy = vpnState.phase == VpnPhase.Preparing ||
+        vpnState.phase == VpnPhase.Connecting ||
+        vpnState.phase == VpnPhase.Disconnecting
+    val connected = vpnState.phase == VpnPhase.Connected
 
     Column(
         modifier = Modifier
@@ -448,7 +455,7 @@ fun VpnScreen() {
     ) {
         Spacer(Modifier.height(20.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.Public, null, tint = NeonMint, modifier = Modifier.size(26.dp))
+            Icon(Icons.Rounded.VpnKey, null, tint = NeonMint, modifier = Modifier.size(26.dp))
             Spacer(Modifier.width(8.dp))
             Text(
                 "Pulse VPN",
@@ -456,202 +463,169 @@ fun VpnScreen() {
                 fontSize = 22.sp,
                 fontWeight = FontWeight.SemiBold
             )
-            Spacer(Modifier.weight(1f))
-            Icon(
-                Icons.Rounded.Refresh,
-                contentDescription = "Обновить",
-                tint = TextSecondary,
-                modifier = Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
-                    .clickable(enabled = !loading) { reload() }
-                    .padding(2.dp)
-            )
         }
         Spacer(Modifier.height(6.dp))
-        Text(status, color = TextSecondary, fontSize = 13.sp)
-        Spacer(Modifier.height(4.dp))
         Text(
-            "Серверы: VPN Gate (Ун-т Цукубы) · логин vpn / пароль vpn",
-            color = TextSecondary.copy(alpha = 0.7f),
-            fontSize = 11.sp
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        when {
-            loading -> Box(
-                Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = NeonMint, strokeWidth = 3.dp)
-                    Spacer(Modifier.height(12.dp))
-                    Text("Загрузка бесплатных серверов…", color = TextSecondary, fontSize = 13.sp)
-                }
-            }
-            error != null && servers.isEmpty() -> Box(
-                Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(error ?: "", color = DangerRose, textAlign = TextAlign.Center)
-                    Spacer(Modifier.height(16.dp))
-                    MethodButton(
-                        title = "Повторить",
-                        subtitle = "Обновить список VPN Gate",
-                        icon = Icons.Rounded.Refresh,
-                        gradient = listOf(NeonMint, ElectricBlue),
-                        enabled = true,
-                        onClick = { reload() }
-                    )
-                }
-            }
-            else -> {
-                selected?.let { server ->
-                    SelectedServerCard(
-                        server = server,
-                        onConnect = {
-                            scope.launch {
-                                status = "Подготовка конфига ${server.countryShort}…"
-                                val ok = withContext(Dispatchers.IO) {
-                                    val file = VpnGateApi.saveConfig(context, server)
-                                    VpnGateApi.openWithOpenVpn(context, file)
-                                }
-                                status = if (ok) {
-                                    "Конфиг открыт. Подтвердите подключение в OpenVPN."
-                                } else {
-                                    "Установите OpenVPN Connect для подключения"
-                                }
-                            }
-                        },
-                        onInstall = { VpnGateApi.openPlayStoreForOpenVpn(context) },
-                        onL2tp = {
-                            status = "L2TP: ${server.ip} · vpn / vpn · ключ vpn"
-                            VpnGateApi.openSystemVpnSettings(context)
-                        },
-                        onClose = { selected = null }
-                    )
-                    Spacer(Modifier.height(12.dp))
-                }
-
-                LazyColumn(
-                    contentPadding = PaddingValues(bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(servers, key = { it.hostName + it.ip }) { server ->
-                        VpnServerRow(
-                            server = server,
-                            selected = selected?.ip == server.ip,
-                            onClick = { selected = server }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SelectedServerCard(
-    server: VpnServer,
-    onConnect: () -> Unit,
-    onInstall: () -> Unit,
-    onL2tp: () -> Unit,
-    onClose: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(Surface1.copy(alpha = 0.95f))
-            .padding(16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                countryFlag(server.countryShort),
-                fontSize = 28.sp
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(server.countryLong, color = TextPrimary, fontWeight = FontWeight.SemiBold)
-                Text("${server.ip} · ping ${server.ping} мс", color = TextSecondary, fontSize = 12.sp)
-            }
-            Text(
-                "✕",
-                color = TextSecondary,
-                modifier = Modifier
-                    .clickable(onClick = onClose)
-                    .padding(8.dp)
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            "OpenVPN-конфиг сохранится и откроется в клиенте. Либо настройте L2TP вручную.",
+            "Встроенный VPN · без других приложений",
             color = TextSecondary,
-            fontSize = 12.sp
+            fontSize = 13.sp
         )
-        Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SmallAction("Подключить", NeonMint, Modifier.weight(1f), onConnect)
-            SmallAction("L2TP", ElectricBlue, Modifier.weight(1f), onL2tp)
+
+        Spacer(Modifier.height(20.dp))
+
+        // Status / connect card
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(Surface1.copy(alpha = 0.95f))
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            listOf(
+                                if (connected) NeonMint.copy(alpha = 0.35f) else ElectricBlue.copy(alpha = 0.2f),
+                                Color.Transparent
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (busy) {
+                    CircularProgressIndicator(color = NeonMint, strokeWidth = 3.dp, modifier = Modifier.size(42.dp))
+                } else {
+                    Icon(
+                        Icons.Rounded.Public,
+                        null,
+                        tint = if (connected) NeonMint else TextSecondary,
+                        modifier = Modifier.size(42.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                when (vpnState.phase) {
+                    VpnPhase.Connected -> "Подключено"
+                    VpnPhase.Connecting, VpnPhase.Preparing -> "Подключение…"
+                    VpnPhase.Disconnecting -> "Отключение…"
+                    VpnPhase.Error -> "Ошибка"
+                    VpnPhase.Disconnected -> "Не подключено"
+                },
+                color = TextPrimary,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                vpnState.message,
+                color = if (vpnState.phase == VpnPhase.Error) DangerRose else TextSecondary,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center
+            )
+            if (connected && vpnState.endpoint.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(vpnState.endpoint, color = NeonMint, fontSize = 12.sp)
+            }
+            Spacer(Modifier.height(18.dp))
+
+            val btnBrush = when {
+                connected -> Brush.horizontalGradient(listOf(DangerRose, SoftViolet))
+                busy -> Brush.horizontalGradient(listOf(Surface2, Surface2))
+                else -> Brush.horizontalGradient(listOf(NeonMint, ElectricBlue))
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp)
+                    .clip(RoundedCornerShape(27.dp))
+                    .background(btnBrush)
+                    .clickable(enabled = !busy) {
+                        if (connected) scope.launch { PulseVpn.disconnect(context) }
+                        else requestConnect()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    when {
+                        connected -> "ОТКЛЮЧИТЬ"
+                        busy -> "ПОДОЖДИТЕ…"
+                        else -> "ПОДКЛЮЧИТЬ"
+                    },
+                    color = if (busy) TextSecondary else DeepSpace,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp,
+                    fontSize = 15.sp
+                )
+            }
         }
-        Spacer(Modifier.height(8.dp))
-        SmallAction("Установить OpenVPN Connect", SoftViolet, Modifier.fillMaxWidth(), onInstall)
+
+        Spacer(Modifier.height(18.dp))
+        Text(
+            "БЕСПЛАТНЫЕ СЕРВЕРЫ",
+            color = TextSecondary,
+            fontSize = 11.sp,
+            letterSpacing = 2.sp,
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(Modifier.height(10.dp))
+
+        LazyColumn(
+            contentPadding = PaddingValues(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(FreeVpnServers.all, key = { it.id }) { server ->
+                FreeServerRow(
+                    server = server,
+                    selected = selected.id == server.id,
+                    enabled = !busy,
+                    onClick = { selected = server }
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun SmallAction(
-    label: String,
-    color: Color,
-    modifier: Modifier = Modifier,
+private fun FreeServerRow(
+    server: FreeVpnServer,
+    selected: Boolean,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(color.copy(alpha = 0.18f))
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp, horizontal = 8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(label, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
-    }
-}
-
-@Composable
-private fun VpnServerRow(server: VpnServer, selected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(if (selected) Surface2 else Surface1.copy(alpha = 0.85f))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(countryFlag(server.countryShort), fontSize = 24.sp)
+        Text(countryFlag(server.countryCode), fontSize = 24.sp)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                server.countryLong.ifBlank { server.countryShort },
+                server.name,
                 color = TextPrimary,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                "${server.hostName} · ${String.format("%.0f", server.speedMbps)} Мбит/с",
+                "${server.country} · ${server.endpoint}",
                 color = TextSecondary,
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
-        Column(horizontalAlignment = Alignment.End) {
-            Text("${server.ping} мс", color = NeonMint, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            Text("${server.sessions} сесс.", color = TextSecondary, fontSize = 11.sp)
+        if (selected) {
+            Text("✓", color = NeonMint, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
     }
 }
