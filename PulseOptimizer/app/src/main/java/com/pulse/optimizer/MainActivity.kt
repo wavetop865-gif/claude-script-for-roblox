@@ -20,15 +20,19 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,8 +40,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Public
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.VpnKey
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -48,6 +58,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,19 +73,24 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pulse.optimizer.ui.theme.DangerRose
 import com.pulse.optimizer.ui.theme.DeepSpace
 import com.pulse.optimizer.ui.theme.ElectricBlue
 import com.pulse.optimizer.ui.theme.NeonMint
+import com.pulse.optimizer.ui.theme.PulseOptimizerTheme
 import com.pulse.optimizer.ui.theme.SoftViolet
 import com.pulse.optimizer.ui.theme.Surface1
+import com.pulse.optimizer.ui.theme.Surface2
 import com.pulse.optimizer.ui.theme.TextPrimary
 import com.pulse.optimizer.ui.theme.TextSecondary
 import com.pulse.optimizer.ui.theme.WarmAmber
-import com.pulse.optimizer.ui.theme.PulseOptimizerTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,27 +102,103 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    OptimizerScreen()
+                    PulseApp()
                 }
             }
         }
     }
 }
 
-private enum class BoostState { Idle, Scanning, Done }
+private enum class Tab { Optimize, Vpn }
+
+@Composable
+fun PulseApp() {
+    var tab by remember { mutableStateOf(Tab.Optimize) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AuroraBackground()
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                when (tab) {
+                    Tab.Optimize -> OptimizerScreen()
+                    Tab.Vpn -> VpnScreen()
+                }
+            }
+            BottomBar(selected = tab, onSelect = { tab = it })
+        }
+    }
+}
+
+@Composable
+private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Surface1.copy(alpha = 0.95f))
+            .navigationBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        BottomItem(
+            label = "Оптимизация",
+            icon = Icons.Rounded.Speed,
+            selected = selected == Tab.Optimize,
+            onClick = { onSelect(Tab.Optimize) }
+        )
+        BottomItem(
+            label = "VPN",
+            icon = Icons.Rounded.VpnKey,
+            selected = selected == Tab.Vpn,
+            onClick = { onSelect(Tab.Vpn) }
+        )
+    }
+}
+
+@Composable
+private fun BottomItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val tint by animateColorAsState(
+        if (selected) NeonMint else TextSecondary,
+        label = "tab"
+    )
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 28.dp, vertical = 6.dp)
+    ) {
+        Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.height(4.dp))
+        Text(label, color = tint, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+/* ───────────────────────── Optimize ───────────────────────── */
+
+private enum class BoostKind { Quick, Deep, Battery }
+private enum class BoostState { Idle, Running, Done }
 
 @Composable
 fun OptimizerScreen() {
     val context = LocalContext.current
     var snapshot by remember { mutableStateOf(DeviceStats.read(context)) }
     var boostState by remember { mutableStateOf(BoostState.Idle) }
+    var activeKind by remember { mutableStateOf(BoostKind.Quick) }
     var scanMessage by remember { mutableStateOf("") }
-    var freedBytes by remember { mutableStateOf(0L) }
+    var resultText by remember { mutableStateOf("") }
     var scoreBonus by remember { mutableIntStateOf(0) }
 
-    // Periodically refresh live stats while idle
     LaunchedEffect(boostState) {
-        if (boostState != BoostState.Scanning) {
+        if (boostState != BoostState.Running) {
             while (true) {
                 snapshot = DeviceStats.read(context)
                 delay(4000)
@@ -114,119 +206,465 @@ fun OptimizerScreen() {
         }
     }
 
-    LaunchedEffect(boostState) {
-        if (boostState == BoostState.Scanning) {
-            val steps = listOf(
+    LaunchedEffect(boostState, activeKind) {
+        if (boostState != BoostState.Running) return@LaunchedEffect
+        val steps = when (activeKind) {
+            BoostKind.Quick -> listOf(
                 "Сканирование памяти…",
-                "Анализ фоновых процессов…",
                 "Очистка кэша…",
-                "Оптимизация хранилища…",
-                "Финальная настройка…",
+                "Освобождение RAM…",
             )
-            for (step in steps) {
-                scanMessage = step
-                delay(900)
-            }
-            freedBytes = DeviceStats.clearOwnCache(context)
-            System.gc()
-            snapshot = DeviceStats.read(context)
-            scoreBonus = 6
-            boostState = BoostState.Done
-            delay(3500)
-            scoreBonus = 0
-            boostState = BoostState.Idle
+            BoostKind.Deep -> listOf(
+                "Поиск временных файлов…",
+                "Очистка code-cache…",
+                "Удаление логов и .tmp…",
+                "Сжатие мусора…",
+                "Финальная проверка…",
+            )
+            BoostKind.Battery -> listOf(
+                "Анализ температуры…",
+                "Снижение фоновой нагрузки…",
+                "Оптимизация энергопотребления…",
+            )
         }
+        for (step in steps) {
+            scanMessage = step
+            delay(700)
+        }
+        val result = withContext(Dispatchers.IO) {
+            when (activeKind) {
+                BoostKind.Quick -> DeviceStats.quickBoost(context)
+                BoostKind.Deep -> DeviceStats.deepClean(context)
+                BoostKind.Battery -> DeviceStats.batteryCare(context)
+            }
+        }
+        snapshot = DeviceStats.read(context)
+        scoreBonus = when (activeKind) {
+            BoostKind.Quick -> 5
+            BoostKind.Deep -> 8
+            BoostKind.Battery -> 4
+        }
+        resultText = when (activeKind) {
+            BoostKind.Quick, BoostKind.Deep ->
+                "${result.label}: освобождено ${DeviceStats.formatBytes(result.freedBytes)}" +
+                    if (result.filesRemoved > 0) " · ${result.filesRemoved} файлов" else ""
+            BoostKind.Battery -> result.label
+        }
+        boostState = BoostState.Done
+        delay(3500)
+        scoreBonus = 0
+        boostState = BoostState.Idle
     }
 
     val displayScore = (snapshot.healthScore + scoreBonus).coerceAtMost(100)
+    val busy = boostState == BoostState.Running
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        AuroraBackground()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .statusBarsPadding()
+            .padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.height(20.dp))
+        Header()
+        Spacer(Modifier.height(24.dp))
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .statusBarsPadding()
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(Modifier.height(20.dp))
-            Header()
-            Spacer(Modifier.height(28.dp))
+        HealthRing(
+            score = displayScore,
+            scanning = busy,
+            modifier = Modifier.size(220.dp)
+        )
 
-            HealthRing(
-                score = displayScore,
-                scanning = boostState == BoostState.Scanning,
-                modifier = Modifier.size(240.dp)
-            )
+        Spacer(Modifier.height(16.dp))
 
-            Spacer(Modifier.height(20.dp))
+        Text(
+            text = when (boostState) {
+                BoostState.Running -> scanMessage
+                BoostState.Done -> resultText
+                BoostState.Idle -> when {
+                    displayScore >= 70 -> "Устройство работает отлично"
+                    displayScore >= 40 -> "Есть что улучшить"
+                    else -> "Рекомендуется оптимизация"
+                }
+            },
+            color = if (boostState == BoostState.Done) NeonMint else TextSecondary,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
 
-            when (boostState) {
-                BoostState.Scanning -> Text(
-                    text = scanMessage,
-                    color = TextSecondary,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center
-                )
-                BoostState.Done -> Text(
-                    text = "Готово! Освобождено ${DeviceStats.formatBytes(freedBytes)} кэша",
-                    color = NeonMint,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center
-                )
-                BoostState.Idle -> Text(
-                    text = if (displayScore >= 70) "Устройство работает отлично"
-                    else if (displayScore >= 40) "Есть что улучшить"
-                    else "Рекомендуется оптимизация",
-                    color = TextSecondary,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center
-                )
+        Spacer(Modifier.height(22.dp))
+
+        Text(
+            text = "МЕТОДЫ ОПТИМИЗАЦИИ",
+            color = TextSecondary,
+            fontSize = 11.sp,
+            letterSpacing = 2.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.align(Alignment.Start)
+        )
+        Spacer(Modifier.height(12.dp))
+
+        MethodButton(
+            title = "Быстрое ускорение",
+            subtitle = "Кэш + оперативная память",
+            icon = Icons.Rounded.Bolt,
+            gradient = listOf(NeonMint, ElectricBlue),
+            enabled = !busy,
+            onClick = {
+                activeKind = BoostKind.Quick
+                boostState = BoostState.Running
             }
+        )
+        Spacer(Modifier.height(10.dp))
+        MethodButton(
+            title = "Глубокая очистка",
+            subtitle = "Временные файлы, логи, code-cache",
+            icon = Icons.Rounded.CleaningServices,
+            gradient = listOf(SoftViolet, ElectricBlue),
+            enabled = !busy,
+            onClick = {
+                activeKind = BoostKind.Deep
+                boostState = BoostState.Running
+            }
+        )
+        Spacer(Modifier.height(10.dp))
+        MethodButton(
+            title = "Забота о батарее",
+            subtitle = "Температура и энергопотребление",
+            icon = Icons.Rounded.BatteryChargingFull,
+            gradient = listOf(WarmAmber, NeonMint),
+            enabled = !busy,
+            onClick = {
+                activeKind = BoostKind.Battery
+                boostState = BoostState.Running
+            }
+        )
 
-            Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
 
-            BoostButton(
-                scanning = boostState == BoostState.Scanning,
-                onClick = { if (boostState == BoostState.Idle) boostState = BoostState.Scanning }
-            )
+        StatCard(
+            icon = Icons.Rounded.Memory,
+            iconTint = ElectricBlue,
+            title = "Оперативная память",
+            value = "${DeviceStats.formatBytes(snapshot.ramUsedBytes)} из ${DeviceStats.formatBytes(snapshot.ramTotalBytes)}",
+            fraction = snapshot.ramFraction,
+            barColors = listOf(ElectricBlue, SoftViolet)
+        )
+        Spacer(Modifier.height(12.dp))
+        StatCard(
+            icon = Icons.Rounded.Storage,
+            iconTint = SoftViolet,
+            title = "Хранилище",
+            value = "${DeviceStats.formatBytes(snapshot.storageUsedBytes)} из ${DeviceStats.formatBytes(snapshot.storageTotalBytes)}",
+            fraction = snapshot.storageFraction,
+            barColors = listOf(SoftViolet, DangerRose)
+        )
+        Spacer(Modifier.height(12.dp))
+        StatCard(
+            icon = Icons.Rounded.BatteryChargingFull,
+            iconTint = WarmAmber,
+            title = if (snapshot.isCharging) "Батарея · заряжается" else "Батарея",
+            value = "${snapshot.batteryPercent}% · ${String.format("%.1f", snapshot.batteryTempC)}°C",
+            fraction = snapshot.batteryPercent / 100f,
+            barColors = listOf(WarmAmber, NeonMint)
+        )
+        Spacer(Modifier.height(24.dp))
+    }
+}
 
-            Spacer(Modifier.height(32.dp))
-
-            StatCard(
-                icon = Icons.Rounded.Memory,
-                iconTint = ElectricBlue,
-                title = "Оперативная память",
-                value = "${DeviceStats.formatBytes(snapshot.ramUsedBytes)} из ${DeviceStats.formatBytes(snapshot.ramTotalBytes)}",
-                fraction = snapshot.ramFraction,
-                barColors = listOf(ElectricBlue, SoftViolet)
-            )
-            Spacer(Modifier.height(14.dp))
-            StatCard(
-                icon = Icons.Rounded.Storage,
-                iconTint = SoftViolet,
-                title = "Хранилище",
-                value = "${DeviceStats.formatBytes(snapshot.storageUsedBytes)} из ${DeviceStats.formatBytes(snapshot.storageTotalBytes)}",
-                fraction = snapshot.storageFraction,
-                barColors = listOf(SoftViolet, DangerRose)
-            )
-            Spacer(Modifier.height(14.dp))
-            StatCard(
-                icon = Icons.Rounded.BatteryChargingFull,
-                iconTint = WarmAmber,
-                title = if (snapshot.isCharging) "Батарея · заряжается" else "Батарея",
-                value = "${snapshot.batteryPercent}% · ${String.format("%.1f", snapshot.batteryTempC)}°C",
-                fraction = snapshot.batteryPercent / 100f,
-                barColors = listOf(WarmAmber, NeonMint)
-            )
-
-            Spacer(Modifier.height(32.dp))
+@Composable
+private fun MethodButton(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    gradient: List<Color>,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Brush.horizontalGradient(gradient.map { it.copy(alpha = if (enabled) 0.18f else 0.08f) }))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(Brush.linearGradient(gradient)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(icon, null, tint = DeepSpace, modifier = Modifier.size(22.dp))
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(subtitle, color = TextSecondary, fontSize = 12.sp)
         }
     }
 }
+
+/* ───────────────────────── VPN ───────────────────────── */
+
+@Composable
+fun VpnScreen() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var servers by remember { mutableStateOf<List<VpnServer>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var selected by remember { mutableStateOf<VpnServer?>(null) }
+    var status by remember { mutableStateOf("Бесплатные серверы VPN Gate") }
+
+    fun reload() {
+        loading = true
+        error = null
+        scope.launch {
+            try {
+                servers = VpnGateApi.fetchServers()
+                status = "Найдено ${servers.size} бесплатных серверов"
+            } catch (e: Exception) {
+                error = e.message ?: "Ошибка загрузки"
+                status = "Не удалось загрузить список"
+            } finally {
+                loading = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { reload() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .padding(horizontal = 20.dp)
+    ) {
+        Spacer(Modifier.height(20.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.Public, null, tint = NeonMint, modifier = Modifier.size(26.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "Pulse VPN",
+                color = TextPrimary,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.weight(1f))
+            Icon(
+                Icons.Rounded.Refresh,
+                contentDescription = "Обновить",
+                tint = TextSecondary,
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .clickable(enabled = !loading) { reload() }
+                    .padding(2.dp)
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(status, color = TextSecondary, fontSize = 13.sp)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Серверы: VPN Gate (Ун-т Цукубы) · логин vpn / пароль vpn",
+            color = TextSecondary.copy(alpha = 0.7f),
+            fontSize = 11.sp
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        when {
+            loading -> Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = NeonMint, strokeWidth = 3.dp)
+                    Spacer(Modifier.height(12.dp))
+                    Text("Загрузка бесплатных серверов…", color = TextSecondary, fontSize = 13.sp)
+                }
+            }
+            error != null && servers.isEmpty() -> Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(error ?: "", color = DangerRose, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(16.dp))
+                    MethodButton(
+                        title = "Повторить",
+                        subtitle = "Обновить список VPN Gate",
+                        icon = Icons.Rounded.Refresh,
+                        gradient = listOf(NeonMint, ElectricBlue),
+                        enabled = true,
+                        onClick = { reload() }
+                    )
+                }
+            }
+            else -> {
+                selected?.let { server ->
+                    SelectedServerCard(
+                        server = server,
+                        onConnect = {
+                            scope.launch {
+                                status = "Подготовка конфига ${server.countryShort}…"
+                                val ok = withContext(Dispatchers.IO) {
+                                    val file = VpnGateApi.saveConfig(context, server)
+                                    VpnGateApi.openWithOpenVpn(context, file)
+                                }
+                                status = if (ok) {
+                                    "Конфиг открыт. Подтвердите подключение в OpenVPN."
+                                } else {
+                                    "Установите OpenVPN Connect для подключения"
+                                }
+                            }
+                        },
+                        onInstall = { VpnGateApi.openPlayStoreForOpenVpn(context) },
+                        onL2tp = {
+                            status = "L2TP: ${server.ip} · vpn / vpn · ключ vpn"
+                            VpnGateApi.openSystemVpnSettings(context)
+                        },
+                        onClose = { selected = null }
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                LazyColumn(
+                    contentPadding = PaddingValues(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(servers, key = { it.hostName + it.ip }) { server ->
+                        VpnServerRow(
+                            server = server,
+                            selected = selected?.ip == server.ip,
+                            onClick = { selected = server }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SelectedServerCard(
+    server: VpnServer,
+    onConnect: () -> Unit,
+    onInstall: () -> Unit,
+    onL2tp: () -> Unit,
+    onClose: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(Surface1.copy(alpha = 0.95f))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                countryFlag(server.countryShort),
+                fontSize = 28.sp
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(server.countryLong, color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                Text("${server.ip} · ping ${server.ping} мс", color = TextSecondary, fontSize = 12.sp)
+            }
+            Text(
+                "✕",
+                color = TextSecondary,
+                modifier = Modifier
+                    .clickable(onClick = onClose)
+                    .padding(8.dp)
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "OpenVPN-конфиг сохранится и откроется в клиенте. Либо настройте L2TP вручную.",
+            color = TextSecondary,
+            fontSize = 12.sp
+        )
+        Spacer(Modifier.height(14.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SmallAction("Подключить", NeonMint, Modifier.weight(1f), onConnect)
+            SmallAction("L2TP", ElectricBlue, Modifier.weight(1f), onL2tp)
+        }
+        Spacer(Modifier.height(8.dp))
+        SmallAction("Установить OpenVPN Connect", SoftViolet, Modifier.fillMaxWidth(), onInstall)
+    }
+}
+
+@Composable
+private fun SmallAction(
+    label: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(color.copy(alpha = 0.18f))
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+private fun VpnServerRow(server: VpnServer, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (selected) Surface2 else Surface1.copy(alpha = 0.85f))
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(countryFlag(server.countryShort), fontSize = 24.sp)
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                server.countryLong.ifBlank { server.countryShort },
+                color = TextPrimary,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                "${server.hostName} · ${String.format("%.0f", server.speedMbps)} Мбит/с",
+                color = TextSecondary,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text("${server.ping} мс", color = NeonMint, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text("${server.sessions} сесс.", color = TextSecondary, fontSize = 11.sp)
+        }
+    }
+}
+
+private fun countryFlag(code: String): String {
+    if (code.length != 2) return "🌐"
+    val c = code.uppercase()
+    val first = Character.codePointAt(c, 0) - 0x41 + 0x1F1E6
+    val second = Character.codePointAt(c, 1) - 0x41 + 0x1F1E6
+    return String(Character.toChars(first)) + String(Character.toChars(second))
+}
+
+/* ───────────────────────── Shared UI ───────────────────────── */
 
 @Composable
 private fun Header() {
@@ -251,7 +689,6 @@ private fun Header() {
     }
 }
 
-/** Soft moving color blobs behind the content. */
 @Composable
 private fun AuroraBackground() {
     val transition = rememberInfiniteTransition(label = "aurora")
@@ -320,7 +757,6 @@ private fun HealthRing(score: Int, scanning: Boolean, modifier: Modifier = Modif
         ),
         label = "breathe"
     )
-
     val ringBrush = Brush.sweepGradient(
         colors = listOf(ElectricBlue, NeonMint, SoftViolet, ElectricBlue)
     )
@@ -340,7 +776,6 @@ private fun HealthRing(score: Int, scanning: Boolean, modifier: Modifier = Modif
             )
             val topLeft = Offset(inset, inset)
 
-            // Track
             drawArc(
                 color = Surface1,
                 startAngle = 120f,
@@ -350,9 +785,7 @@ private fun HealthRing(score: Int, scanning: Boolean, modifier: Modifier = Modif
                 size = arcSize,
                 style = Stroke(width = stroke, cap = StrokeCap.Round)
             )
-
             if (scanning) {
-                // Spinning comet while scanning
                 drawArc(
                     brush = ringBrush,
                     startAngle = spin,
@@ -374,58 +807,20 @@ private fun HealthRing(score: Int, scanning: Boolean, modifier: Modifier = Modif
                 )
             }
         }
-
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = if (scanning) "…" else "$score",
                 color = TextPrimary,
-                fontSize = 56.sp,
+                fontSize = 52.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = if (scanning) "оптимизация" else "индекс здоровья",
                 color = TextSecondary,
-                fontSize = 13.sp,
+                fontSize = 12.sp,
                 letterSpacing = 1.sp
             )
         }
-    }
-}
-
-@Composable
-private fun BoostButton(scanning: Boolean, onClick: () -> Unit) {
-    val bgColor by animateColorAsState(
-        targetValue = if (scanning) Surface1 else Color.Transparent,
-        label = "btnBg"
-    )
-    val brush = if (scanning) {
-        Brush.horizontalGradient(listOf(Surface1, Surface1))
-    } else {
-        Brush.horizontalGradient(listOf(NeonMint, ElectricBlue))
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(58.dp)
-            .clip(RoundedCornerShape(29.dp))
-            .background(brush)
-            .background(bgColor)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                enabled = !scanning,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = if (scanning) "ОПТИМИЗАЦИЯ…" else "УСКОРИТЬ",
-            color = if (scanning) TextSecondary else DeepSpace,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 3.sp
-        )
     }
 }
 
@@ -443,7 +838,6 @@ private fun StatCard(
         animationSpec = tween(900),
         label = "bar"
     )
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -459,27 +853,13 @@ private fun StatCard(
                     .background(iconTint.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(22.dp)
-                )
+                Icon(icon, null, tint = iconTint, modifier = Modifier.size(22.dp))
             }
             Spacer(Modifier.width(14.dp))
             Column {
-                Text(
-                    text = title,
-                    color = TextPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium
-                )
+                Text(title, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(2.dp))
-                Text(
-                    text = value,
-                    color = TextSecondary,
-                    fontSize = 13.sp
-                )
+                Text(value, color = TextSecondary, fontSize = 13.sp)
             }
         }
         Spacer(Modifier.height(14.dp))

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- VPN Gate public API is HTTP-only -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">vpngate.net</domain>
+        <domain includeSubdomains="true">www.vpngate.net</domain>
+    </domain-config>
+</network-security-config>

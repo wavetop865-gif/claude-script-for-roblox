@@ -24,7 +24,6 @@ data class DeviceSnapshot(
     val storageFraction: Float
         get() = if (storageTotalBytes > 0) storageUsedBytes.toFloat() / storageTotalBytes else 0f
 
-    /** Composite 0..100 health score: free RAM, free storage and battery all contribute. */
     val healthScore: Int
         get() {
             val ramScore = (1f - ramFraction) * 40f
@@ -33,6 +32,12 @@ data class DeviceSnapshot(
             return (ramScore + storageScore + batteryScore).toInt().coerceIn(0, 100)
         }
 }
+
+data class CleanResult(
+    val freedBytes: Long,
+    val filesRemoved: Int,
+    val label: String,
+)
 
 object DeviceStats {
 
@@ -66,26 +71,94 @@ object DeviceStats {
         )
     }
 
-    /** Deletes this app's own cache directories and returns the number of bytes freed. */
-    fun clearOwnCache(context: Context): Long {
+    /** Quick boost: clear app caches + request GC. */
+    fun quickBoost(context: Context): CleanResult {
         var freed = 0L
+        var files = 0
         val dirs = listOfNotNull(context.cacheDir, context.externalCacheDir)
         for (dir in dirs) {
-            freed += deleteRecursively(dir, keepRoot = true)
+            val r = deleteRecursively(dir, keepRoot = true)
+            freed += r.first
+            files += r.second
         }
-        return freed
+        System.gc()
+        return CleanResult(freed, files, "Быстрое ускорение")
     }
 
-    private fun deleteRecursively(file: File, keepRoot: Boolean): Long {
+    /**
+     * Deep clean: cache + code_cache + temp files under filesDir +
+     * leftover .tmp / .log files. Different method from quickBoost.
+     */
+    fun deepClean(context: Context): CleanResult {
         var freed = 0L
+        var files = 0
+
+        val targets = buildList {
+            add(context.cacheDir)
+            add(context.codeCacheDir)
+            context.externalCacheDir?.let { add(it) }
+            add(File(context.filesDir, "temp"))
+            add(File(context.filesDir, "tmp"))
+            add(File(context.filesDir, "logs"))
+        }
+
+        for (dir in targets) {
+            if (!dir.exists()) continue
+            val r = deleteRecursively(dir, keepRoot = true)
+            freed += r.first
+            files += r.second
+        }
+
+        // Sweep leftover temp/log files in filesDir root
+        context.filesDir.listFiles()?.forEach { f ->
+            val name = f.name.lowercase()
+            if (f.isFile && (name.endsWith(".tmp") || name.endsWith(".log") || name.endsWith(".cache"))) {
+                val size = f.length()
+                if (f.delete()) {
+                    freed += size
+                    files += 1
+                }
+            }
+        }
+
+        Runtime.getRuntime().gc()
+        System.runFinalization()
+        System.gc()
+
+        return CleanResult(freed, files, "Глубокая очистка")
+    }
+
+    /** Battery care: drop temp heat sources (caches) + return tip based on temp. */
+    fun batteryCare(context: Context): CleanResult {
+        val before = read(context)
+        val quick = quickBoost(context)
+        val tip = when {
+            before.batteryTempC >= 40f -> "Батарея горячая — снизьте яркость и закройте тяжёлые приложения"
+            before.isCharging && before.batteryPercent >= 80 -> "Заряд почти полный — можно отключить зарядку"
+            before.batteryPercent <= 20 -> "Низкий заряд — включите режим энергосбережения"
+            else -> "Температура в норме · кэш очищен для снижения нагрузки"
+        }
+        return CleanResult(quick.freedBytes, quick.filesRemoved, tip)
+    }
+
+    private fun deleteRecursively(file: File, keepRoot: Boolean): Pair<Long, Int> {
+        var freed = 0L
+        var count = 0
         if (file.isDirectory) {
-            file.listFiles()?.forEach { freed += deleteRecursively(it, keepRoot = false) }
+            file.listFiles()?.forEach {
+                val r = deleteRecursively(it, keepRoot = false)
+                freed += r.first
+                count += r.second
+            }
         }
         if (!keepRoot) {
             val size = if (file.isFile) file.length() else 0L
-            if (file.delete()) freed += size
+            if (file.delete()) {
+                freed += size
+                count += 1
+            }
         }
-        return freed
+        return freed to count
     }
 
     fun formatBytes(bytes: Long): String {
