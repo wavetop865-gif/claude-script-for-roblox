@@ -17,8 +17,10 @@
 
 local Players    = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Lighting   = game:GetService("Lighting")
 
 local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
 
 -- ------------------------------------------------------------
 --  Load the WindUI library from GitHub
@@ -52,6 +54,11 @@ local FX = {
 	Aura         = false,
 	AuraColor    = Color3.fromRGB(90, 230, 130),
 	AuraRainbow  = false,
+
+	-- world / weather (client-side)
+	Rain         = false,
+	Snow         = false,
+	Storm        = false,
 }
 
 -- ------------------------------------------------------------
@@ -190,6 +197,182 @@ local function buildAura()
 end
 local function destroyAura()
 	if auraObj then auraObj:Destroy(); auraObj = nil end
+end
+
+-- ============================================================
+--  World / Weather (client-side, cosmetic)
+-- ============================================================
+-- Snapshot the original lighting so we can fully restore it later.
+local origLighting = {
+	Ambient        = Lighting.Ambient,
+	OutdoorAmbient = Lighting.OutdoorAmbient,
+	Brightness     = Lighting.Brightness,
+	ClockTime      = Lighting.ClockTime,
+	FogColor       = Lighting.FogColor,
+	FogEnd         = Lighting.FogEnd,
+	FogStart       = Lighting.FogStart,
+}
+
+-- ColorCorrection effect for world tint + saturation.
+local ccEffect
+local function ensureCC()
+	if ccEffect and ccEffect.Parent then return ccEffect end
+	ccEffect = Instance.new("ColorCorrectionEffect")
+	ccEffect.Name    = "Vis_CC"
+	ccEffect.Enabled = true
+	ccEffect.Parent  = Lighting
+	return ccEffect
+end
+
+-- Precipitation lives on a flat part that follows the camera each frame.
+local weatherPart, rainEmitter, snowEmitter
+local function ensureWeatherPart()
+	if weatherPart and weatherPart.Parent then return weatherPart end
+	weatherPart = Instance.new("Part")
+	weatherPart.Name         = "Vis_Weather"
+	weatherPart.Anchored     = true
+	weatherPart.CanCollide   = false
+	weatherPart.CanQuery     = false
+	weatherPart.CanTouch     = false
+	weatherPart.Transparency = 1
+	weatherPart.Size         = Vector3.new(130, 1, 130)
+	weatherPart.Parent       = workspace
+	return weatherPart
+end
+
+local function setRain(on: boolean, heavy: boolean?)
+	if on then
+		ensureWeatherPart()
+		if rainEmitter then rainEmitter:Destroy() end
+		rainEmitter = Instance.new("ParticleEmitter")
+		rainEmitter.Name             = "Vis_Rain"
+		rainEmitter.Texture          = "rbxasset://textures/particles/sparkles_main.dds"
+		rainEmitter.Color            = ColorSequence.new(Color3.fromRGB(170, 190, 220))
+		rainEmitter.Transparency     = NumberSequence.new(0.35)
+		rainEmitter.Rate             = heavy and 900 or 500
+		rainEmitter.Lifetime         = NumberRange.new(0.7, 0.9)
+		rainEmitter.Speed            = NumberRange.new(90, 110)
+		rainEmitter.Size             = NumberSequence.new(0.35)
+		rainEmitter.Acceleration     = Vector3.new(0, -180, 0)
+		rainEmitter.EmissionDirection = Enum.NormalId.Bottom
+		rainEmitter.SpreadAngle      = Vector2.new(6, 6)
+		rainEmitter.LightEmission    = 0.3
+		pcall(function() rainEmitter.Squash = NumberSequence.new(6) end) -- stretch into streaks
+		rainEmitter.Parent = weatherPart
+	else
+		if rainEmitter then rainEmitter:Destroy(); rainEmitter = nil end
+	end
+end
+
+local function setSnow(on: boolean)
+	if on then
+		ensureWeatherPart()
+		if snowEmitter then snowEmitter:Destroy() end
+		snowEmitter = Instance.new("ParticleEmitter")
+		snowEmitter.Name             = "Vis_Snow"
+		snowEmitter.Texture          = "rbxasset://textures/particles/sparkles_main.dds"
+		snowEmitter.Color            = ColorSequence.new(Color3.fromRGB(255, 255, 255))
+		snowEmitter.Transparency     = NumberSequence.new(0.1)
+		snowEmitter.Rate             = 220
+		snowEmitter.Lifetime         = NumberRange.new(2.5, 3.5)
+		snowEmitter.Speed            = NumberRange.new(6, 12)
+		snowEmitter.Size             = NumberSequence.new(0.45)
+		snowEmitter.Rotation         = NumberRange.new(0, 360)
+		snowEmitter.RotSpeed         = NumberRange.new(-40, 40)
+		snowEmitter.Acceleration     = Vector3.new(2, -8, 0)
+		snowEmitter.EmissionDirection = Enum.NormalId.Bottom
+		snowEmitter.SpreadAngle      = Vector2.new(40, 40)
+		snowEmitter.LightEmission    = 0.5
+		snowEmitter.Parent = weatherPart
+	else
+		if snowEmitter then snowEmitter:Destroy(); snowEmitter = nil end
+	end
+end
+
+-- Fog density: 0 = clear (restore original), 1 = very dense.
+local function applyFog(density: number)
+	if density <= 0.001 then
+		Lighting.FogEnd   = origLighting.FogEnd
+		Lighting.FogStart = origLighting.FogStart
+		return
+	end
+	local far = 2000 + (60 - 2000) * density -- lerp 2000 -> 60
+	Lighting.FogStart = 0
+	Lighting.FogEnd   = far
+end
+
+local function applyStorm(on: boolean)
+	if on then
+		Lighting.ClockTime      = 15
+		Lighting.Brightness     = 0.6
+		Lighting.Ambient        = Color3.fromRGB(60, 62, 70)
+		Lighting.OutdoorAmbient = Color3.fromRGB(70, 72, 82)
+		Lighting.FogColor       = Color3.fromRGB(90, 92, 100)
+		applyFog(0.35)
+		setRain(true, true)
+	else
+		setRain(FX.Rain, false)
+		Lighting.Ambient        = origLighting.Ambient
+		Lighting.OutdoorAmbient = origLighting.OutdoorAmbient
+		Lighting.Brightness     = origLighting.Brightness
+		Lighting.ClockTime      = origLighting.ClockTime
+		Lighting.FogColor       = origLighting.FogColor
+		if not FX.Rain then applyFog(0) end
+	end
+end
+
+-- Sky presets: adjust ClockTime / ambient / stars for a distinct sky mood.
+local customSky
+local function clearCustomSky()
+	if customSky then customSky:Destroy(); customSky = nil end
+end
+local function applySkyPreset(name: string)
+	clearCustomSky()
+	if name == "Default" then
+		Lighting.ClockTime      = origLighting.ClockTime
+		Lighting.Ambient        = origLighting.Ambient
+		Lighting.OutdoorAmbient = origLighting.OutdoorAmbient
+		return
+	elseif name == "Clear Day" then
+		Lighting.ClockTime      = 14
+		Lighting.Ambient        = Color3.fromRGB(140, 145, 155)
+		Lighting.OutdoorAmbient = Color3.fromRGB(150, 155, 165)
+	elseif name == "Sunset" then
+		Lighting.ClockTime      = 17.6
+		Lighting.Ambient        = Color3.fromRGB(120, 80, 60)
+		Lighting.OutdoorAmbient = Color3.fromRGB(150, 100, 70)
+	elseif name == "Night" then
+		Lighting.ClockTime      = 0
+		Lighting.Ambient        = Color3.fromRGB(30, 34, 55)
+		Lighting.OutdoorAmbient = Color3.fromRGB(40, 44, 70)
+		customSky = Instance.new("Sky")
+		customSky.StarCount           = 6000
+		customSky.CelestialBodiesShown = true
+		customSky.Parent = Lighting
+	elseif name == "Galaxy" then
+		Lighting.ClockTime      = 0
+		Lighting.Ambient        = Color3.fromRGB(60, 40, 80)
+		Lighting.OutdoorAmbient = Color3.fromRGB(70, 50, 95)
+		customSky = Instance.new("Sky")
+		customSky.StarCount           = 10000
+		customSky.CelestialBodiesShown = false
+		customSky.Parent = Lighting
+	end
+end
+
+local function resetWorld()
+	setRain(false); setSnow(false)
+	FX.Rain, FX.Snow, FX.Storm = false, false, false
+	clearCustomSky()
+	if ccEffect then ccEffect:Destroy(); ccEffect = nil end
+	if weatherPart then weatherPart:Destroy(); weatherPart = nil end
+	Lighting.Ambient        = origLighting.Ambient
+	Lighting.OutdoorAmbient = origLighting.OutdoorAmbient
+	Lighting.Brightness     = origLighting.Brightness
+	Lighting.ClockTime      = origLighting.ClockTime
+	Lighting.FogColor       = origLighting.FogColor
+	Lighting.FogEnd         = origLighting.FogEnd
+	Lighting.FogStart       = origLighting.FogStart
 end
 
 -- ---- Re-apply on respawn -----------------------------------
@@ -354,6 +537,75 @@ partTab:Toggle({
 	Callback = function(v) FX.AuraRainbow = v end,
 })
 
+-- ---- World tab ---------------------------------------------
+local worldTab = Window:Tab({ Title = "World", Icon = "cloud" })
+worldTab:Toggle({
+	Title = "Rain",
+	Value = false,
+	Callback = function(v)
+		FX.Rain = v
+		if not FX.Storm then setRain(v, false) end
+	end,
+})
+worldTab:Toggle({
+	Title = "Snow",
+	Value = false,
+	Callback = function(v)
+		FX.Snow = v
+		setSnow(v)
+	end,
+})
+worldTab:Toggle({
+	Title = "Storm (rain + dark + lightning)",
+	Value = false,
+	Callback = function(v)
+		FX.Storm = v
+		applyStorm(v)
+	end,
+})
+worldTab:Slider({
+	Title = "Fog",
+	Step  = 0.01,
+	Value = { Min = 0, Max = 1, Default = 0 },
+	Callback = function(v) applyFog(v) end,
+})
+worldTab:Slider({
+	Title = "Time of Day",
+	Step  = 0.1,
+	Value = { Min = 0, Max = 24, Default = 14 },
+	Callback = function(v) Lighting.ClockTime = v end,
+})
+worldTab:Slider({
+	Title = "Brightness",
+	Step  = 0.1,
+	Value = { Min = 0, Max = 5, Default = 2 },
+	Callback = function(v) Lighting.Brightness = v end,
+})
+worldTab:Colorpicker({
+	Title = "World Tint",
+	Default = Color3.fromRGB(255, 255, 255),
+	Callback = function(c) ensureCC().TintColor = c end,
+})
+worldTab:Slider({
+	Title = "Saturation",
+	Step  = 0.05,
+	Value = { Min = -1, Max = 2, Default = 0 },
+	Callback = function(v) ensureCC().Saturation = v end,
+})
+worldTab:Dropdown({
+	Title = "Sky Preset",
+	Values = { "Default", "Clear Day", "Sunset", "Night", "Galaxy" },
+	Value = "Default",
+	Callback = function(name) applySkyPreset(name) end,
+})
+worldTab:Button({
+	Title = "Reset World",
+	Callback = function()
+		resetWorld()
+		WindUI:Notify({ Title = "World", Content = "Lighting restored.", Duration = 3 })
+	end,
+})
+
 -- ---- Info tab ----------------------------------------------
 local infoTab = Window:Tab({ Title = "Info", Icon = "info" })
 infoTab:Paragraph({
@@ -366,6 +618,7 @@ infoTab:Button({
 	Callback = function()
 		destroyTrail(); destroyGlow(); destroySparkles(); destroyAura()
 		applyNeon(false)
+		resetWorld()
 		FX.Trail, FX.Glow, FX.Neon, FX.Sparkles, FX.Aura = false, false, false, false, false
 		WindUI:Notify({ Title = "Visuals", Content = "All effects cleared.", Duration = 3 })
 	end,
@@ -374,9 +627,29 @@ infoTab:Button({
 -- ============================================================
 --  Rainbow / animated color driver
 -- ============================================================
+local nextStrike = 0
 RunService.RenderStepped:Connect(function()
 	local hue = (tick() * 0.15) % 1
 	local rainbow = Color3.fromHSV(hue, 0.85, 1)
+
+	-- Keep precipitation centered above the camera.
+	if weatherPart and (rainEmitter or snowEmitter) then
+		weatherPart.Position = camera.CFrame.Position + Vector3.new(0, 45, 0)
+	end
+
+	-- Storm lightning: brief brightness flashes at random intervals.
+	if FX.Storm then
+		local t = time()
+		if t >= nextStrike then
+			nextStrike = t + math.random(4, 10)
+			task.spawn(function()
+				for _, b in ipairs({ 3, 0.3, 2.5, 0.6 }) do
+					Lighting.Brightness = b
+					task.wait(0.06)
+				end
+			end)
+		end
+	end
 
 	if FX.Trail and FX.TrailRainbow and trailObj then
 		trailObj.Color = ColorSequence.new(rainbow)
