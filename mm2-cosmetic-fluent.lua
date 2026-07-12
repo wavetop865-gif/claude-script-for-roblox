@@ -16,9 +16,10 @@
 --  StarterPlayer > StarterPlayerScripts as a LocalScript.
 -- ============================================================
 
-local Players    = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Lighting   = game:GetService("Lighting")
+local Players      = game:GetService("Players")
+local RunService   = game:GetService("RunService")
+local Lighting     = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
@@ -45,6 +46,12 @@ local FX = {
 
 	Knife = false, KnifeColor = Color3.fromRGB(255, 60, 60), KnifeRainbow = false,
 	Coin = false,
+
+	Halo = false, HaloColor = Color3.fromRGB(255, 230, 120), HaloRainbow = false,
+	Orb = false, OrbColor = Color3.fromRGB(120, 200, 255), OrbRainbow = false, OrbSpeed = 1.5,
+	Footsteps = false,
+	Shockwave = false,
+	Cinema = false,
 
 	RainbowSpeed = 0.15,
 }
@@ -345,6 +352,201 @@ local function watchCoins(on)
 end
 
 -- ============================================================
+--  Fun effects (all local / cosmetic)
+-- ============================================================
+-- ---- Halo: spinning neon disc above your head ---------------
+local haloPart
+local function setHalo(on)
+	if on then
+		if haloPart then haloPart:Destroy() end
+		haloPart = Instance.new("Part")
+		haloPart.Name         = "Vis_Halo"
+		haloPart.Anchored     = true
+		haloPart.CanCollide   = false
+		haloPart.CanQuery     = false
+		haloPart.CanTouch     = false
+		haloPart.Material     = Enum.Material.Neon
+		haloPart.Shape        = Enum.PartType.Cylinder
+		haloPart.Size         = Vector3.new(0.12, 2.2, 2.2)
+		haloPart.Transparency = 0.25
+		haloPart.Color        = FX.HaloColor
+		haloPart.Parent       = workspace
+	else
+		if haloPart then haloPart:Destroy(); haloPart = nil end
+	end
+end
+
+-- ---- Orbit orb: glowing "pet" circling around you -----------
+local orbPart
+local function setOrb(on)
+	if on then
+		if orbPart then orbPart:Destroy() end
+		orbPart = Instance.new("Part")
+		orbPart.Name       = "Vis_Orb"
+		orbPart.Anchored   = true
+		orbPart.CanCollide = false
+		orbPart.CanQuery   = false
+		orbPart.CanTouch   = false
+		orbPart.Material   = Enum.Material.Neon
+		orbPart.Shape      = Enum.PartType.Ball
+		orbPart.Size       = Vector3.new(0.7, 0.7, 0.7)
+		orbPart.Color      = FX.OrbColor
+		orbPart.Parent     = workspace
+		local l = Instance.new("PointLight")
+		l.Brightness = 2; l.Range = 12; l.Color = FX.OrbColor; l.Parent = orbPart
+		local e = Instance.new("ParticleEmitter")
+		e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		e.Rate = 25; e.Lifetime = NumberRange.new(0.3, 0.6)
+		e.Speed = NumberRange.new(0.5, 1); e.Size = NumberSequence.new(0.25)
+		e.LightEmission = 1; e.Parent = orbPart
+	else
+		if orbPart then orbPart:Destroy(); orbPart = nil end
+	end
+end
+
+-- ---- Footstep sparks ----------------------------------------
+local stepEmitter
+local function buildStepEmitter()
+	local _, hrp = getChar()
+	if not hrp then return end
+	if stepEmitter then stepEmitter:Destroy() end
+	stepEmitter = Instance.new("ParticleEmitter")
+	stepEmitter.Name = "Vis_Steps"
+	stepEmitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	stepEmitter.Rate = 0 -- burst-only via :Emit
+	stepEmitter.Lifetime = NumberRange.new(0.3, 0.5)
+	stepEmitter.Speed = NumberRange.new(2, 4)
+	stepEmitter.SpreadAngle = Vector2.new(60, 60)
+	stepEmitter.Size = NumberSequence.new(0.25)
+	stepEmitter.LightEmission = 1
+	stepEmitter.EmissionDirection = Enum.NormalId.Bottom
+	stepEmitter.Parent = hrp
+end
+local function setFootsteps(on)
+	if on then buildStepEmitter()
+	elseif stepEmitter then stepEmitter:Destroy(); stepEmitter = nil end
+end
+
+-- ---- Jump shockwave -----------------------------------------
+local function spawnShockwave()
+	local _, hrp = getChar()
+	if not hrp then return end
+	local ring = Instance.new("Part")
+	ring.Anchored     = true
+	ring.CanCollide   = false
+	ring.CanQuery     = false
+	ring.CanTouch     = false
+	ring.Material     = Enum.Material.Neon
+	ring.Shape        = Enum.PartType.Cylinder
+	ring.Size         = Vector3.new(0.12, 1, 1)
+	ring.Transparency = 0.2
+	ring.Color        = Color3.fromRGB(255, 255, 255)
+	ring.CFrame       = CFrame.new(hrp.Position - Vector3.new(0, 2.7, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	ring.Parent       = workspace
+	TweenService:Create(ring, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = Vector3.new(0.12, 14, 14),
+		Transparency = 1,
+	}):Play()
+	task.delay(0.5, function() ring:Destroy() end)
+end
+local humStateConn
+local function hookHumanoid()
+	if humStateConn then humStateConn:Disconnect(); humStateConn = nil end
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not hum then return end
+	humStateConn = hum.StateChanged:Connect(function(_, new)
+		if FX.Shockwave and new == Enum.HumanoidStateType.Jumping then
+			spawnShockwave()
+		end
+	end)
+end
+
+-- ---- Fireworks (button) -------------------------------------
+local function firework()
+	local _, hrp = getChar()
+	if not hrp then return end
+	for i = 1, 4 do
+		task.delay(i * 0.3, function()
+			local _, hrp2 = getChar()
+			if not hrp2 then return end
+			local p = Instance.new("Part")
+			p.Anchored = true; p.CanCollide = false; p.CanQuery = false; p.CanTouch = false
+			p.Transparency = 1
+			p.Size = Vector3.new(1, 1, 1)
+			p.Position = hrp2.Position + Vector3.new(math.random(-12, 12), math.random(16, 26), math.random(-12, 12))
+			p.Parent = workspace
+			local e = Instance.new("ParticleEmitter")
+			e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+			e.Color = ColorSequence.new(Color3.fromHSV(math.random(), 0.8, 1))
+			e.Rate = 0
+			e.Lifetime = NumberRange.new(0.8, 1.2)
+			e.Speed = NumberRange.new(25, 35)
+			e.SpreadAngle = Vector2.new(180, 180)
+			e.Size = NumberSequence.new(0.4)
+			e.LightEmission = 1
+			e.Acceleration = Vector3.new(0, -20, 0)
+			e.Parent = p
+			e:Emit(140)
+			task.delay(2, function() p:Destroy() end)
+		end)
+	end
+end
+
+-- ---- Confetti (button) --------------------------------------
+local CONFETTI_COLORS = {
+	Color3.fromRGB(255, 80, 120), Color3.fromRGB(255, 200, 60),
+	Color3.fromRGB(90, 230, 130), Color3.fromRGB(70, 200, 255),
+	Color3.fromRGB(190, 120, 255),
+}
+local function confetti()
+	local _, hrp = getChar()
+	if not hrp then return end
+	for _, col in ipairs(CONFETTI_COLORS) do
+		local e = Instance.new("ParticleEmitter")
+		e.Color = ColorSequence.new(col)
+		e.Rate = 0
+		e.Lifetime = NumberRange.new(1.2, 1.8)
+		e.Speed = NumberRange.new(12, 18)
+		e.SpreadAngle = Vector2.new(70, 70)
+		e.Size = NumberSequence.new(0.3)
+		e.Rotation = NumberRange.new(0, 360)
+		e.RotSpeed = NumberRange.new(-200, 200)
+		e.Acceleration = Vector3.new(0, -25, 0)
+		e.EmissionDirection = Enum.NormalId.Top
+		e.Parent = hrp
+		e:Emit(20)
+		task.delay(2.2, function() e:Destroy() end)
+	end
+end
+
+-- ---- Cinema mode (letterbox bars) ---------------------------
+local cinemaGui
+local function setCinema(on)
+	if on then
+		if cinemaGui then cinemaGui:Destroy() end
+		cinemaGui = Instance.new("ScreenGui")
+		cinemaGui.Name = "Vis_Cinema"
+		cinemaGui.IgnoreGuiInset = true
+		cinemaGui.DisplayOrder = 500
+		cinemaGui.ResetOnSpawn = false
+		local function bar(anchorY, posY)
+			local f = Instance.new("Frame")
+			f.AnchorPoint = Vector2.new(0, anchorY)
+			f.Position = UDim2.new(0, 0, posY, 0)
+			f.Size = UDim2.new(1, 0, 0.11, 0)
+			f.BackgroundColor3 = Color3.new(0, 0, 0)
+			f.BorderSizePixel = 0
+			f.Parent = cinemaGui
+		end
+		bar(0, 0); bar(1, 1)
+		cinemaGui.Parent = player:WaitForChild("PlayerGui")
+	else
+		if cinemaGui then cinemaGui:Destroy(); cinemaGui = nil end
+	end
+end
+
+-- ============================================================
 --  Re-apply on respawn
 -- ============================================================
 player.CharacterAdded:Connect(function()
@@ -355,10 +557,13 @@ player.CharacterAdded:Connect(function()
 	if FX.Neon then applyNeon(true) end
 	if FX.Light then setLight(true) end
 	if FX.Knife then buildKnifeTrail() end
+	if FX.Footsteps then buildStepEmitter() end
 	hookToolEquip()
+	hookHumanoid()
 	if FX.Coin then watchCoins(true) end
 end)
 hookToolEquip()
+hookHumanoid()
 
 -- ============================================================
 --  Build the Fluent window
@@ -377,6 +582,7 @@ local Tabs = {
 	Character = Window:AddTab({ Title = "Character", Icon = "user" }),
 	World     = Window:AddTab({ Title = "World",     Icon = "cloud" }),
 	MM2       = Window:AddTab({ Title = "MM2",        Icon = "sparkles" }),
+	Fun       = Window:AddTab({ Title = "Fun",        Icon = "party-popper" }),
 	Settings  = Window:AddTab({ Title = "Settings",   Icon = "settings" }),
 }
 
@@ -439,31 +645,98 @@ m:AddToggle("KnifeRainbow", { Title = "Rainbow Knife Trail", Default = false, Ca
 m:AddToggle("Coin", { Title = "Coin Sparkle", Default = false, Callback = function(v) FX.Coin = v; watchCoins(v) end })
 m:AddButton({ Title = "Test Sparkle", Description = "Preview the coin sparkle burst", Callback = coinBurst })
 
+-- ---- Fun tab ------------------------------------------------
+local f = Tabs.Fun
+f:AddToggle("Halo", { Title = "Halo", Default = false, Callback = function(v) FX.Halo = v; setHalo(v) end })
+f:AddColorpicker("HaloColor", { Title = "Halo Color", Default = FX.HaloColor, Callback = function(col)
+	FX.HaloColor = col; if haloPart and not FX.HaloRainbow then haloPart.Color = col end
+end })
+f:AddToggle("HaloRainbow", { Title = "Rainbow Halo", Default = false, Callback = function(v) FX.HaloRainbow = v end })
+f:AddToggle("Orb", { Title = "Orbit Orb (pet)", Default = false, Callback = function(v) FX.Orb = v; setOrb(v) end })
+f:AddColorpicker("OrbColor", { Title = "Orb Color", Default = FX.OrbColor, Callback = function(col)
+	FX.OrbColor = col
+	if orbPart and not FX.OrbRainbow then
+		orbPart.Color = col
+		local l = orbPart:FindFirstChildOfClass("PointLight")
+		if l then l.Color = col end
+	end
+end })
+f:AddToggle("OrbRainbow", { Title = "Rainbow Orb", Default = false, Callback = function(v) FX.OrbRainbow = v end })
+f:AddSlider("OrbSpeed", { Title = "Orb Speed", Default = 1.5, Min = 0.3, Max = 5, Rounding = 1, Callback = function(v) FX.OrbSpeed = v end })
+f:AddToggle("Footsteps", { Title = "Footstep Sparks", Default = false, Callback = function(v) FX.Footsteps = v; setFootsteps(v) end })
+f:AddToggle("Shockwave", { Title = "Jump Shockwave", Default = false, Callback = function(v) FX.Shockwave = v end })
+f:AddToggle("Cinema", { Title = "Cinema Mode (letterbox)", Default = false, Callback = function(v) FX.Cinema = v; setCinema(v) end })
+f:AddButton({ Title = "Fireworks", Description = "Launch a firework show above you", Callback = firework })
+f:AddButton({ Title = "Confetti", Description = "Pop a confetti burst", Callback = confetti })
+
 -- ---- Settings tab ------------------------------------------
 local s = Tabs.Settings
 s:AddSlider("RainbowSpeed", { Title = "Rainbow Speed", Default = 0.15, Min = 0.02, Max = 1, Rounding = 2, Callback = function(v) FX.RainbowSpeed = v end })
 s:AddButton({ Title = "Clear All Effects", Description = "Remove everything and restore the world", Callback = function()
 	destroyTrail(); destroyGlow(); applyNeon(false); setLight(false); destroyKnife(); watchCoins(false)
+	setHalo(false); setOrb(false); setFootsteps(false); setCinema(false)
 	resetWorld()
 	FX.Trail, FX.Glow, FX.Neon, FX.Light, FX.Knife, FX.Coin = false, false, false, false, false, false
+	FX.Halo, FX.Orb, FX.Footsteps, FX.Shockwave, FX.Cinema = false, false, false, false, false
 	Fluent:Notify({ Title = "MM2 Cosmetic", Content = "All effects cleared.", Duration = 3 })
 end })
 
 -- ============================================================
 --  Animated color driver + weather follow
 -- ============================================================
-RunService.RenderStepped:Connect(function()
-	local hue = (tick() * FX.RainbowSpeed) % 1
+local stepAccum = 0
+RunService.RenderStepped:Connect(function(dt)
+	local t = tick()
+	local hue = (t * FX.RainbowSpeed) % 1
 	local rainbow = Color3.fromHSV(hue, 0.85, 1)
 
 	if weatherPart and (rainEmitter or snowEmitter) then
 		weatherPart.Position = camera.CFrame.Position + Vector3.new(0, 50, 0)
 	end
+
+	local char, hrp = getChar()
+
+	-- Halo: hover above the head with a slow wobble
+	if FX.Halo and haloPart then
+		local head = char and char:FindFirstChild("Head")
+		if head then
+			local tilt = math.rad(10) * math.sin(t * 1.5)
+			haloPart.CFrame = CFrame.new(head.Position + Vector3.new(0, 1.4, 0))
+				* CFrame.Angles(0, t * 0.8, tilt)
+				* CFrame.Angles(0, 0, math.rad(90))
+		end
+	end
+
+	-- Orbit orb: circle around the player with a gentle bob
+	if FX.Orb and orbPart and hrp then
+		local a = t * FX.OrbSpeed
+		orbPart.Position = hrp.Position
+			+ Vector3.new(math.cos(a) * 3.2, 1.6 + math.sin(t * 2) * 0.45, math.sin(a) * 3.2)
+	end
+
+	-- Footstep sparks while moving on the ground
+	if FX.Footsteps and stepEmitter then
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		if hum and hum.MoveDirection.Magnitude > 0.1 and hum.FloorMaterial ~= Enum.Material.Air then
+			stepAccum += dt
+			if stepAccum >= 0.16 then
+				stepAccum = 0
+				stepEmitter:Emit(3)
+			end
+		end
+	end
+
 	if FX.Trail and FX.TrailRainbow and trailObj then trailObj.Color = ColorSequence.new(rainbow) end
 	if FX.Glow and FX.GlowRainbow and glowObj then glowObj.FillColor = rainbow; glowObj.OutlineColor = rainbow end
 	if FX.Neon and FX.NeonRainbow then for p in pairs(neonParts) do if p and p.Parent then p.Color = rainbow end end end
 	if FX.Light and FX.LightRainbow and lightObj then lightObj.Color = rainbow end
 	if FX.Knife and FX.KnifeRainbow and knifeTrail then knifeTrail.Color = ColorSequence.new(rainbow) end
+	if FX.Halo and FX.HaloRainbow and haloPart then haloPart.Color = rainbow end
+	if FX.Orb and FX.OrbRainbow and orbPart then
+		orbPart.Color = rainbow
+		local l = orbPart:FindFirstChildOfClass("PointLight")
+		if l then l.Color = rainbow end
+	end
 end)
 
 Fluent:Notify({
