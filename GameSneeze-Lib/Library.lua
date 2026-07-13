@@ -1027,7 +1027,7 @@ do
         --
         theme.accent = accent
         --
-        local window = {pages = {}, loader = style == 2, init = false, pageammount = pageammount, isVisible = false, callback = callback, uibind = Enum.KeyCode.Z, wminfo = "$$$$$ AntarcticaWare $$$$$ || UID : %u || Ping : %s || Fps : %u", currentPage = nil, fading = false, dragging = false, drag = Vector2.new(0,0), currentContent = {frame = nil, dropdown = nil, multibox = nil, colorpicker = nil, keybind = nil, textbox = nil}}
+        local window = {pages = {}, loader = style == 2, init = false, pageammount = pageammount, isVisible = false, callback = callback, uibind = Enum.KeyCode.Z, wminfo = "$$$$$ AntarcticaWare $$$$$ || UID : %u || Ping : %s || Fps : %u", currentPage = nil, fading = false, dragging = false, drag = Vector2.new(0,0), previewDragging = false, previewDrag = Vector2.new(0,0), currentContent = {frame = nil, dropdown = nil, multibox = nil, colorpicker = nil, keybind = nil, textbox = nil}}
         --
         local main_frame = utility:Create("Frame", {Vector2.new(0,0)}, {
             Size = utility:Size(0, size.X, 0, size.Y),
@@ -1153,6 +1153,8 @@ do
                 Fading = false,
                 State = false,
                 Visible = true,
+                Position = Vector2.new(0, 0),
+                Frame = nil,
                 Drawings = {},
                 Components = {
                     Box = {
@@ -1286,7 +1288,7 @@ do
                 Position = utility:Position(0, 10, 0, 10, esppreview_inner_frame),
                 Color = Color3.fromRGB(0, 0, 0),
                 Transparency = 0
-            })
+            }, window.VisualPreview.Drawings)
             --
             local BoxSize = utility:Size(1, -7, 1, -55, esppreview_frame_previewbox)
             local healthbaroutline
@@ -1400,8 +1402,7 @@ do
             --
             library.began[#library.began + 1] = function(Input)
                 if utility:IsClickInput(Input) and esppreview_visiblebutton.Visible and window.isVisible and utility:MouseOverDrawing({esppreview_visiblebutton.Position.X, esppreview_visiblebutton.Position.Y, esppreview_visiblebutton.Position.X + esppreview_visiblebutton.TextBounds.X, esppreview_visiblebutton.Position.Y + esppreview_visiblebutton.TextBounds.Y}) and not window:IsOverContent() then
-                    window.VisualPreview.Visible = not window.VisualPreview.Visible
-                    esppreview_visiblebutton.Text = window.VisualPreview.Visible and "O" or "0"
+                    window.VisualPreview:SetWindowVisible(not window.VisualPreview.Visible)
                 end
             end
             --
@@ -1657,6 +1658,44 @@ do
                 --
                 window.VisualPreview.Drawings = NewDrawings
             end
+            --
+            window.VisualPreview.Frame = esppreview_frame
+            window.VisualPreview.CloseButton = esppreview_visiblebutton
+            window.VisualPreview.Position = Vector2.new(main_frame.Position.X + main_frame.Size.X + 5, main_frame.Position.Y)
+            utility:UpdateOffset(esppreview_frame, {Vector2.new(window.VisualPreview.Position.X, window.VisualPreview.Position.Y)})
+            --
+            function window.VisualPreview:Move(vector)
+                window.VisualPreview.Position = vector
+                local frame = window.VisualPreview.Frame
+                if not frame then
+                    return
+                end
+                --
+                frame.Position = utility:Position(0, vector.X, 0, vector.Y)
+                for i, v in pairs(library.drawings) do
+                    if v[1].Visible and window.VisualPreview.Drawings[v[1]] and v[1] ~= frame and v[2][2] then
+                        v[1].Position = utility:Position(0, v[2][1].X, 0, v[2][1].Y, v[2][2])
+                    end
+                end
+            end
+            --
+            function window.VisualPreview:SetWindowVisible(state)
+                window.VisualPreview.Visible = state
+                esppreview_visiblebutton.Text = state and "O" or "0"
+                --
+                for drawing, transparency in pairs(window.VisualPreview.Drawings) do
+                    drawing.Visible = state
+                    if state then
+                        utility:UpdateTransparency(drawing, transparency)
+                    end
+                end
+                --
+                if state then
+                    window.VisualPreview:Move(window.VisualPreview.Position)
+                end
+            end
+            --
+            window.VisualPreview:Move(window.VisualPreview.Position)
         end
         --
         function window:SetName(Name)
@@ -1689,11 +1728,12 @@ do
         end
         --
         function window:Move(vector)
+            local previewFrame = window.VisualPreview and window.VisualPreview.Frame
             for i,v in pairs(library.drawings) do
                 if v[1].Visible then
                     if v[2][2] then
                         v[1].Position = utility:Position(0, v[2][1].X, 0, v[2][1].Y, v[2][2])
-                    else
+                    elseif v[1] ~= previewFrame then
                         v[1].Position = utility:Position(0, vector.X, 0, vector.Y)
                     end
                 end
@@ -2493,7 +2533,19 @@ do
         end
         --
         library.began[#library.began + 1] = function(Input)
-            if utility:IsClickInput(Input) and window.isVisible and window.isVisible and utility:MouseOverDrawing({main_frame.Position.X,main_frame.Position.Y,main_frame.Position.X + main_frame.Size.X,main_frame.Position.Y + 20}) then
+            if utility:IsClickInput(Input) and window.isVisible and window.VisualPreview and window.VisualPreview.Visible and window.VisualPreview.Frame then
+                local previewFrame = window.VisualPreview.Frame
+                local closeButton = window.VisualPreview.CloseButton
+                local closeBounds = closeButton and {closeButton.Position.X, closeButton.Position.Y, closeButton.Position.X + closeButton.TextBounds.X, closeButton.Position.Y + closeButton.TextBounds.Y} or {0, 0, 0, 0}
+                if utility:MouseOverDrawing({previewFrame.Position.X, previewFrame.Position.Y, previewFrame.Position.X + previewFrame.Size.X, previewFrame.Position.Y + 20}) and not utility:MouseOverDrawing(closeBounds) and not window:IsOverContent() then
+                    local mouseLocation = utility:MouseLocation()
+                    window.previewDragging = true
+                    window.previewDrag = Vector2.new(mouseLocation.X - previewFrame.Position.X, mouseLocation.Y - previewFrame.Position.Y)
+                    return
+                end
+            end
+            --
+            if utility:IsClickInput(Input) and window.isVisible and utility:MouseOverDrawing({main_frame.Position.X,main_frame.Position.Y,main_frame.Position.X + main_frame.Size.X,main_frame.Position.Y + 20}) and not window:IsOverContent() then
                 local mouseLocation = utility:MouseLocation()
                 --
                 window.dragging = true
@@ -2531,6 +2583,11 @@ do
                 window.drag = Vector2.new(0, 0)
             end
             --
+            if utility:IsClickInput(Input) and window.isVisible and window.previewDragging then
+                window.previewDragging = false
+                window.previewDrag = Vector2.new(0, 0)
+            end
+            --
             if window.currentContent.textbox and window.currentContent.textbox.Fire and window.currentContent.textbox.Backspace then
                 if utility:InputToString(Input.KeyCode) == "Back" then
                     window.currentContent.textbox.Backspace = nil
@@ -2541,13 +2598,12 @@ do
         library.changed[#library.changed + 1] = function(Input)
             if window.dragging and window.isVisible then
                 local mouseLocation = utility:MouseLocation()
-                if utility:GetScreenSize().Y-main_frame.Size.Y-5 > 5 then
-                    local move = Vector2.new(math.clamp(mouseLocation.X - window.drag.X, 5, utility:GetScreenSize().X-main_frame.Size.X-5), math.clamp(mouseLocation.Y - window.drag.Y, 5, utility:GetScreenSize().Y-main_frame.Size.Y-5))
-                    window:Move(move)
-                else
-                    local move = Vector2.new(mouseLocation.X - window.drag.X, mouseLocation.Y - window.drag.Y)
-                    window:Move(move)
-                end
+                local move = Vector2.new(mouseLocation.X - window.drag.X, mouseLocation.Y - window.drag.Y)
+                window:Move(move)
+            elseif window.previewDragging and window.isVisible and window.VisualPreview then
+                local mouseLocation = utility:MouseLocation()
+                local move = Vector2.new(mouseLocation.X - window.previewDrag.X, mouseLocation.Y - window.previewDrag.Y)
+                window.VisualPreview:Move(move)
             end
         end
         --
@@ -2571,7 +2627,7 @@ do
         --
         utility:Connection(uis.InputBegan,function(Input)
             for _, func in pairs(library.began) do
-                if not window.dragging then
+                if not window.dragging and not window.previewDragging then
                     local e,s = pcall(function()
                         func(Input)
                     end)
@@ -2628,17 +2684,19 @@ do
         --
         local position = 4
         --
-        for i,v in pairs(window.pages) do
-            position = position + (v.page_button.Size.X+2)
+        for _, v in ipairs(window.pages) do
+            position = position + (v.tabWidth or v.page_button.Size.X) + 2
         end
         --
         local textbounds = utility:GetTextBounds(name, theme.textsize, theme.font)
+        local tabWidth = window.pageammount and (((window.back_frame.Size.X - 8 - ((window.pageammount - 1) * 2)) / window.pageammount)) or (textbounds.X + 20)
         --
         local page_button = utility:Create("Frame", {Vector2.new(position,4), window.back_frame}, {
-            Size = utility:Size(0, window.pageammount and (((window.back_frame.Size.X - 8 - ((window.pageammount - 1) * 2)) / window.pageammount)) or (textbounds.X+20), 0, 21),
+            Size = utility:Size(0, tabWidth, 0, 21),
             Position = utility:Position(0, position, 0, 4, window.back_frame),
             Color = theme.outline
         });page["page_button"] = page_button
+        page.tabWidth = tabWidth
         --
         library.colors[page_button] = {
             Color = "outline"
