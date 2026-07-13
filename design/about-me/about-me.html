@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Malo Paul — Обо мне</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&family=Onest:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --black: #050505;
+      --ink: #0d0d0d;
+      --gray: #1a1a1a;
+      --gray-mid: #3a3a3a;
+      --gray-soft: #8a8a8a;
+      --white: #e6e6ea;
+      --white-dim: #cacace;
+      --font: "Onest", sans-serif;
+      --font-display: "Unbounded", sans-serif;
+      --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      background: var(--black);
+      color: var(--white);
+      line-height: 1.65;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    /* ===== WAVY BACKGROUND ===== */
+    .bg-waves {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .bg-waves svg {
+      position: absolute;
+      width: 200%;
+      left: -50%;
+      opacity: 0.07;
+      will-change: transform;
+    }
+
+    .bg-waves svg:nth-child(1) {
+      top: -8%;
+      animation: wave-drift-1 14s ease-in-out infinite;
+    }
+
+    .bg-waves svg:nth-child(2) {
+      top: 28%;
+      opacity: 0.05;
+      animation: wave-drift-2 18s ease-in-out infinite;
+    }
+
+    .bg-waves svg:nth-child(3) {
+      bottom: -12%;
+      opacity: 0.06;
+      animation: wave-drift-3 16s ease-in-out infinite;
+    }
+
+    @keyframes wave-drift-1 {
+      0%, 100% { transform: translateX(0) translateY(0) scaleY(1); }
+      25% { transform: translateX(-4%) translateY(12px) scaleY(1.03); }
+      50% { transform: translateX(-8%) translateY(0) scaleY(1.06); }
+      75% { transform: translateX(-4%) translateY(-10px) scaleY(1.02); }
+    }
+
+    @keyframes wave-drift-2 {
+      0%, 100% { transform: translateX(-6%) translateY(0) scaleY(1); }
+      33% { transform: translateX(0) translateY(-14px) scaleY(1.04); }
+      66% { transform: translateX(6%) translateY(8px) scaleY(0.98); }
+    }
+
+    @keyframes wave-drift-3 {
+      0%, 100% { transform: translateX(4%) translateY(0) scaleY(1); }
+      50% { transform: translateX(-6%) translateY(16px) scaleY(1.05); }
+    }
+
+    .wrap { position: relative; z-index: 1; }
+
+    /* ===== WAVE DIVIDER ===== */
+    .wave-divider {
+      width: 100%;
+      line-height: 0;
+      overflow: hidden;
+      height: 80px;
+      position: relative;
+    }
+
+    .wave-divider__track {
+      display: flex;
+      width: 200%;
+      height: 80px;
+      animation: wave-flow 10s linear infinite;
+      will-change: transform;
+    }
+
+    .wave-divider__track svg {
+      display: block;
+      width: 50%;
+      height: 80px;
+      flex-shrink: 0;
+    }
+
+    .wave-divider--flip .wave-divider__track {
+      animation: wave-flow-reverse 12s linear infinite;
+    }
+
+    .wave-divider--slow .wave-divider__track {
+      animation-duration: 16s;
+    }
+
+    @keyframes wave-flow {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    @keyframes wave-flow-reverse {
+      0% { transform: translateX(-50%); }
+      100% { transform: translateX(0); }
+    }
+
+    /* ===== HEADER ===== */
+    .header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.1rem 5vw;
+      background: rgba(5, 5, 5, 0.8);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .logo {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: -0.02em;
+      padding: 0.5rem 0.9rem;
+      border: 2px solid var(--white);
+      border-radius: 100px;
+    }
+
+    .nav { display: flex; gap: 2rem; }
+
+    .nav a {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--gray-soft);
+      transition: color 0.25s var(--ease);
+      position: relative;
+    }
+
+    .nav a::after {
+      content: "";
+      position: absolute;
+      left: 0; bottom: -6px;
+      width: 100%; height: 2px;
+      background: var(--white);
+      border-radius: 2px;
+      transform: scaleX(0);
+      transform-origin: right;
+      transition: transform 0.3s var(--ease);
+    }
+
+    .nav a:hover { color: var(--white); }
+    .nav a:hover::after { transform: scaleX(1); transform-origin: left; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      font-family: var(--font);
+      font-weight: 600;
+      font-size: 0.88rem;
+      border-radius: 100px;
+      cursor: pointer;
+      transition: all 0.3s var(--ease);
+    }
+
+    .btn--white {
+      background: var(--white);
+      color: var(--black);
+      border: 2px solid var(--white);
+    }
+
+    .btn--white:hover {
+      background: transparent;
+      color: var(--white);
+    }
+
+    .btn--outline {
+      background: transparent;
+      color: var(--white);
+      border: 2px solid rgba(255,255,255,0.35);
+    }
+
+    .btn--outline:hover {
+      border-color: var(--white);
+      background: rgba(255,255,255,0.05);
+    }
+
+    .btn--sm {
+      padding: 0.55rem 1.1rem;
+      font-size: 0.8rem;
+      border: 1px solid rgba(255,255,255,0.25);
+      background: transparent;
+      color: var(--white);
+      border-radius: 100px;
+    }
+
+    /* ===== HERO ===== */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 8rem 5vw 5rem;
+      position: relative;
+    }
+
+    .hero__inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+    }
+
+    .hero__tag {
+      display: inline-block;
+      margin-bottom: 1.5rem;
+      padding: 0.35rem 0.9rem;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 100px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gray-soft);
+    }
+
+    .hero__title {
+      font-family: var(--font-display);
+      font-size: clamp(2.5rem, 6vw, 4.5rem);
+      font-weight: 700;
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      margin-bottom: 1.25rem;
+    }
+
+    .hero__title em {
+      font-style: normal;
+      display: block;
+      color: var(--gray-soft);
+      font-size: 0.55em;
+      font-weight: 500;
+      margin-top: 0.3em;
+    }
+
+    .hero__text {
+      color: var(--gray-soft);
+      font-size: 1.05rem;
+      max-width: 460px;
+      margin-bottom: 2rem;
+    }
+
+    .hero__btns { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
+    .hero__visual {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .hero__avatar {
+      width: min(340px, 85vw);
+      aspect-ratio: 1;
+      position: relative;
+      border-radius: 28px;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,0.18);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.06),
+        0 28px 70px rgba(0,0,0,0.55);
+      background: var(--gray);
+    }
+
+    .hero__avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 15%;
+      display: block;
+    }
+
+    .hero__avatar-badge {
+      position: absolute;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0.4rem 0.85rem;
+      border-radius: 100px;
+      background: rgba(5,5,5,0.78);
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(10px);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--white-dim);
+      white-space: nowrap;
+    }
+
+    .hero__avatar-badge::before {
+      content: "";
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #6ee7a0;
+      box-shadow: 0 0 8px #6ee7a0;
+      margin-right: 0.45rem;
+      vertical-align: middle;
+    }
+
+    .hero__stats {
+      display: flex;
+      gap: 2.5rem;
+      margin-top: 3.5rem;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      grid-column: 1 / -1;
+    }
+
+    .stat__num {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 700;
+      display: block;
+    }
+
+    .stat__lbl {
+      font-size: 0.78rem;
+      color: var(--gray-soft);
+      margin-top: 0.15rem;
+    }
+
+    /* ===== SECTIONS ===== */
+    .section {
+      padding: 5rem 5vw;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section--light {
+      max-width: none;
+      background: var(--white);
+      color: var(--black);
+      padding: 5rem 5vw;
+    }
+
+    .section--light .section__inner {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section--dark {
+      max-width: none;
+      background: var(--ink);
+      padding: 5rem 5vw;
+    }
+
+    .section--dark .section__inner {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section__label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--gray-soft);
+      margin-bottom: 0.75rem;
+    }
+
+    .section--light .section__label { color: var(--gray-mid); }
+
+    .section__title {
+      font-family: var(--font-display);
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 2.5rem;
+    }
+
+    /* ===== ABOUT ===== */
+    .about__grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: start;
+    }
+
+    .about__text p {
+      color: var(--gray-mid);
+      margin-bottom: 1rem;
+      font-size: 1rem;
+    }
+
+    .about__cards { display: flex; flex-direction: column; gap: 1rem; }
+
+    .card {
+      padding: 1.5rem;
+      border-radius: 20px;
+      border: 1px solid rgba(0,0,0,0.08);
+      background: var(--white);
+      transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .section--dark .card {
+      background: var(--gray);
+      border-color: rgba(255,255,255,0.08);
+      color: var(--white);
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--black);
+    }
+
+    .section--dark .card::before { background: var(--white); }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.12);
+    }
+
+    .section--dark .card:hover {
+      box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+    }
+
+    .card__icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: var(--black);
+      color: var(--white);
+      display: grid;
+      place-items: center;
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+    }
+
+    .section--dark .card__icon {
+      background: var(--white);
+      color: var(--black);
+    }
+
+    .card h3 {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+
+    .card p {
+      font-size: 0.88rem;
+      color: var(--gray-mid);
+    }
+
+    .section--dark .card p { color: var(--gray-soft); }
+
+    /* ===== TIMELINE ===== */
+    .timeline { display: grid; gap: 0; }
+
+    .timeline__row {
+      display: grid;
+      grid-template-columns: 100px 1fr;
+      gap: 2rem;
+      padding: 2rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      position: relative;
+    }
+
+    .timeline__row:last-child { border-bottom: none; }
+
+    .timeline__year {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--gray-soft);
+      padding-top: 0.2rem;
+    }
+
+    .timeline__content h3 {
+      font-family: var(--font-display);
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+
+    .timeline__content p {
+      color: var(--gray-soft);
+      font-size: 0.92rem;
+    }
+
+    /* ===== SKILLS ===== */
+    .skills__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+
+    .skill {
+      padding: 2rem 1.5rem;
+      border-radius: 24px;
+      border: 1px solid rgba(0,0,0,0.08);
+      background: var(--white);
+      text-align: center;
+      transition: transform 0.3s var(--ease);
+    }
+
+    .skill:hover { transform: translateY(-6px); }
+
+    .skill__wave {
+      width: 60px; height: 30px;
+      margin: 0 auto 1.25rem;
+      animation: skill-wave-bob 3s ease-in-out infinite;
+    }
+
+    .skill:nth-child(2) .skill__wave { animation-delay: -1s; }
+    .skill:nth-child(3) .skill__wave { animation-delay: -2s; }
+
+    @keyframes skill-wave-bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+
+    .skill h3 {
+      font-family: var(--font-display);
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    .skill ul {
+      list-style: none;
+      display: grid;
+      gap: 0.45rem;
+    }
+
+    .skill li {
+      font-size: 0.85rem;
+      color: var(--gray-mid);
+    }
+
+    /* ===== PROJECTS ===== */
+    .projects__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+
+    .project {
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: var(--gray);
+      transition: transform 0.3s var(--ease), border-color 0.3s;
+    }
+
+    .project:hover {
+      transform: translateY(-6px);
+      border-color: rgba(255,255,255,0.2);
+    }
+
+    .project__top {
+      height: 180px;
+      position: relative;
+      overflow: hidden;
+      background: var(--black);
+    }
+
+    .project__img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      filter: grayscale(25%) contrast(1.08) brightness(0.92);
+      transition: filter 0.35s var(--ease), transform 0.45s var(--ease);
+    }
+
+    .project:hover .project__img {
+      filter: grayscale(0%) contrast(1.05) brightness(1);
+      transform: scale(1.06);
+    }
+
+    .project__top svg {
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      width: 200%;
+      height: 60px;
+      z-index: 2;
+      pointer-events: none;
+      animation: project-wave 6s ease-in-out infinite;
+    }
+
+    .project:nth-child(2) .project__top svg { animation-delay: -2s; }
+    .project:nth-child(3) .project__top svg { animation-delay: -4s; }
+
+    @keyframes project-wave {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(-12%); }
+    }
+
+    .project__body { padding: 1.25rem 1.4rem 1.5rem; }
+
+    .project__tag {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gray-soft);
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    .project h3 {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+
+    .project p {
+      font-size: 0.84rem;
+      color: var(--gray-soft);
+      margin-bottom: 0.75rem;
+    }
+
+    .project a {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--white);
+      border-bottom: 1px solid rgba(255,255,255,0.3);
+      padding-bottom: 1px;
+      transition: border-color 0.2s;
+    }
+
+    .project a:hover { border-color: var(--white); }
+
+    /* ===== CONTACT ===== */
+    .contact {
+      text-align: center;
+      padding: 6rem 5vw;
+      position: relative;
+    }
+
+    .contact__wave-bg {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      opacity: 0.04;
+    }
+
+    .contact__wave-bg svg {
+      position: absolute;
+      width: 220%;
+      left: -60%;
+      top: 10%;
+      animation: contact-wave 20s ease-in-out infinite;
+      will-change: transform;
+    }
+
+    @keyframes contact-wave {
+      0%, 100% { transform: translateX(0) translateY(0); }
+      50% { transform: translateX(8%) translateY(-20px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bg-waves svg,
+      .wave-divider__track,
+      .skill__wave,
+      .project__top svg,
+      .contact__wave-bg svg {
+        animation: none !important;
+      }
+    }
+
+    .contact__inner {
+      position: relative;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .contact__title {
+      font-family: var(--font-display);
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 1rem;
+    }
+
+    .contact__sub {
+      color: var(--gray-soft);
+      margin-bottom: 2.5rem;
+      font-size: 1rem;
+    }
+
+    .contact__links {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .contact__link {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 2rem;
+      border: 2px solid rgba(255,255,255,0.15);
+      border-radius: 100px;
+      min-width: 320px;
+      justify-content: center;
+      transition: all 0.3s var(--ease);
+      font-weight: 500;
+    }
+
+    .contact__link:hover {
+      border-color: var(--white);
+      background: rgba(255,255,255,0.05);
+    }
+
+    .contact__link strong { font-weight: 600; }
+
+    /* ===== FOOTER ===== */
+    .footer {
+      padding: 2rem 5vw;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--gray-soft);
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 900px) {
+      .nav { display: none; }
+      .hero__inner { grid-template-columns: 1fr; gap: 2.5rem; }
+      .hero__visual { order: -1; }
+      .hero__stats { flex-wrap: wrap; gap: 1.5rem; }
+      .about__grid, .skills__grid, .projects__grid { grid-template-columns: 1fr; }
+      .timeline__row { grid-template-columns: 1fr; gap: 0.5rem; }
+      .contact__link { min-width: auto; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Animated background waves -->
+  <div class="bg-waves" aria-hidden="true">
+    <svg viewBox="0 0 1440 320" fill="none"><path fill="#fff" d="M0,160 C360,280 720,40 1080,160 C1260,220 1380,200 1440,180 L1440,0 L0,0 Z"/></svg>
+    <svg viewBox="0 0 1440 320" fill="none"><path fill="#fff" d="M0,200 C480,80 720,280 1080,140 C1200,100 1350,240 1440,200 L1440,320 L0,320 Z"/></svg>
+    <svg viewBox="0 0 1440 320" fill="none"><path fill="#fff" d="M0,120 C240,240 600,60 900,180 C1100,260 1300,100 1440,160 L1440,320 L0,320 Z"/></svg>
+  </div>
+
+  <div class="wrap">
+
+    <header class="header">
+      <a class="logo" href="#hero">MP</a>
+      <nav class="nav">
+        <a href="#about">Обо мне</a>
+        <a href="#story">История</a>
+        <a href="#skills">Навыки</a>
+        <a href="#projects">Проекты</a>
+        <a href="#contact">Контакты</a>
+      </nav>
+      <a class="btn btn--sm" href="#contact">Написать</a>
+    </header>
+
+    <main>
+
+      <!-- HERO -->
+      <section id="hero" class="hero">
+        <div class="hero__inner">
+          <div>
+            <span class="hero__tag">Портфолио</span>
+            <h1 class="hero__title">
+              Malo Paul
+              <em>Разработчик &amp; создатель</em>
+            </h1>
+            <p class="hero__text">
+              Делаю интерфейсы, скрипты и сайты. Чёрно-белая эстетика,
+              волны, чистые формы — без лишнего.
+            </p>
+            <div class="hero__btns">
+              <a class="btn btn--white" href="#story">Моя история</a>
+              <a class="btn btn--outline" href="#projects">Проекты</a>
+            </div>
+          </div>
+
+          <div class="hero__visual">
+            <div class="hero__avatar">
+              <img src="assets/avatar.png" alt="Malo Paul" />
+              <span class="hero__avatar-badge">online</span>
+            </div>
+          </div>
+
+          <div class="hero__stats">
+            <div><span class="stat__num">3+</span><span class="stat__lbl">года в разработке</span></div>
+            <div><span class="stat__num">10+</span><span class="stat__lbl">проектов</span></div>
+            <div><span class="stat__num">∞</span><span class="stat__lbl">идей</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- WAVE: black → white -->
+      <div class="wave-divider">
+        <div class="wave-divider__track">
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none">
+            <path fill="#e6e6ea" d="M0,40 C240,80 480,0 720,40 C960,80 1200,0 1440,40 L1440,80 L0,80 Z"/>
+          </svg>
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none" aria-hidden="true">
+            <path fill="#e6e6ea" d="M0,40 C240,80 480,0 720,40 C960,80 1200,0 1440,40 L1440,80 L0,80 Z"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- ABOUT (white section) -->
+      <section id="about" class="section--light">
+        <div class="section__inner">
+          <p class="section__label">Кто я</p>
+          <h2 class="section__title">Обо мне</h2>
+          <div class="about__grid">
+            <div class="about__text">
+              <p>
+                Я Malo Paul — разработчик с вниманием к визуалу.
+                Создаю игровые интерфейсы в Roblox, пишу скрипты на Lua
+                и учусь веб-разработке.
+              </p>
+              <p>
+                Люблю минимализм: чёрный, белый, волны, чистая типографика.
+                Каждый проект — это баланс между кодом и дизайном.
+              </p>
+            </div>
+            <div class="about__cards">
+              <article class="card">
+                <div class="card__icon">◎</div>
+                <h3>Фокус</h3>
+                <p>Игровые UI, скрипты, веб-страницы</p>
+              </article>
+              <article class="card">
+                <div class="card__icon">◇</div>
+                <h3>Подход</h3>
+                <p>Идея → структура → код → полировка</p>
+              </article>
+              <article class="card">
+                <div class="card__icon">△</div>
+                <h3>Ценности</h3>
+                <p>Честность, качество, постоянный рост</p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- WAVE: white → dark -->
+      <div class="wave-divider wave-divider--flip">
+        <div class="wave-divider__track">
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none" style="transform:scaleY(-1)">
+            <path fill="#0d0d0d" d="M0,40 C360,0 720,80 1080,40 C1260,20 1380,60 1440,40 L1440,80 L0,80 Z"/>
+          </svg>
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none" style="transform:scaleY(-1)" aria-hidden="true">
+            <path fill="#0d0d0d" d="M0,40 C360,0 720,80 1080,40 C1260,20 1380,60 1440,40 L1440,80 L0,80 Z"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- STORY (dark section) -->
+      <section id="story" class="section--dark">
+        <div class="section__inner">
+          <p class="section__label">Мой путь</p>
+          <h2 class="section__title">История</h2>
+          <div class="timeline">
+            <div class="timeline__row">
+              <div class="timeline__year">2022</div>
+              <div class="timeline__content">
+                <h3>Первые шаги в Roblox</h3>
+                <p>Скрипты, эксперименты в Studio. Понял, что важен не только геймплей, но и внешний вид.</p>
+              </div>
+            </div>
+            <div class="timeline__row">
+              <div class="timeline__year">2023</div>
+              <div class="timeline__content">
+                <h3>UI и тёмные темы</h3>
+                <p>Первые меню в dark monochrome. Модульные библиотеки для разных проектов.</p>
+              </div>
+            </div>
+            <div class="timeline__row">
+              <div class="timeline__year">2024</div>
+              <div class="timeline__content">
+                <h3>От кода к дизайну</h3>
+                <p>Композиция, иерархия, анимации. Баланс функциональности и эстетики.</p>
+              </div>
+            </div>
+            <div class="timeline__row">
+              <div class="timeline__year">2025</div>
+              <div class="timeline__content">
+                <h3>Сейчас</h3>
+                <p>Open-source, веб, поиск единомышленников. Строю свой продукт.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- WAVE: dark → white -->
+      <div class="wave-divider wave-divider--slow">
+        <div class="wave-divider__track">
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none">
+            <path fill="#e6e6ea" d="M0,50 C300,10 600,70 900,30 C1100,10 1300,60 1440,40 L1440,80 L0,80 Z"/>
+          </svg>
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none" aria-hidden="true">
+            <path fill="#e6e6ea" d="M0,50 C300,10 600,70 900,30 C1100,10 1300,60 1440,40 L1440,80 L0,80 Z"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- SKILLS (white section) -->
+      <section id="skills" class="section--light">
+        <div class="section__inner">
+          <p class="section__label">Что умею</p>
+          <h2 class="section__title">Навыки</h2>
+          <div class="skills__grid">
+            <div class="skill">
+              <svg class="skill__wave" viewBox="0 0 60 30"><path fill="#050505" d="M0,15 Q15,0 30,15 T60,15 V30 H0 Z"/></svg>
+              <h3>Разработка</h3>
+              <ul>
+                <li>Lua / Luau</li>
+                <li>Roblox Studio</li>
+                <li>HTML / CSS</li>
+                <li>JavaScript</li>
+              </ul>
+            </div>
+            <div class="skill">
+              <svg class="skill__wave" viewBox="0 0 60 30"><path fill="#050505" d="M0,20 Q15,5 30,20 T60,20 V30 H0 Z"/></svg>
+              <h3>Дизайн</h3>
+              <ul>
+                <li>UI / UX</li>
+                <li>Тёмные темы</li>
+                <li>Типографика</li>
+                <li>Figma</li>
+              </ul>
+            </div>
+            <div class="skill">
+              <svg class="skill__wave" viewBox="0 0 60 30"><path fill="#050505" d="M0,10 Q15,25 30,10 T60,10 V30 H0 Z"/></svg>
+              <h3>Инструменты</h3>
+              <ul>
+                <li>Git / GitHub</li>
+                <li>VS Code / Cursor</li>
+                <li>Roblox API</li>
+                <li>Tween анимации</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- WAVE: white → dark -->
+      <div class="wave-divider wave-divider--flip wave-divider--slow">
+        <div class="wave-divider__track">
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none" style="transform:scaleY(-1)">
+            <path fill="#0d0d0d" d="M0,30 C240,70 480,10 720,50 C960,80 1200,20 1440,50 L1440,80 L0,80 Z"/>
+          </svg>
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none" style="transform:scaleY(-1)" aria-hidden="true">
+            <path fill="#0d0d0d" d="M0,30 C240,70 480,10 720,50 C960,80 1200,20 1440,50 L1440,80 L0,80 Z"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- PROJECTS (dark section) -->
+      <section id="projects" class="section--dark">
+        <div class="section__inner">
+          <p class="section__label">Работы</p>
+          <h2 class="section__title">Проекты</h2>
+          <div class="projects__grid">
+            <article class="project">
+              <div class="project__top">
+                <img class="project__img" src="assets/project-roblox-ui.png" alt="Dark UI Menu" />
+                <svg viewBox="0 0 400 60" preserveAspectRatio="none"><path fill="#1a1a1a" d="M0,30 C100,60 200,0 300,30 C350,45 380,20 400,30 L400,60 L0,60 Z"/></svg>
+              </div>
+              <div class="project__body">
+                <span class="project__tag">Roblox</span>
+                <h3>Dark UI Menu</h3>
+                <p>Модульная библиотека тёмного интерфейса.</p>
+                <a href="#">Подробнее →</a>
+              </div>
+            </article>
+            <article class="project">
+              <div class="project__top">
+                <img class="project__img" src="assets/project-website.png" alt="Личный сайт" />
+                <svg viewBox="0 0 400 60" preserveAspectRatio="none"><path fill="#1a1a1a" d="M0,20 C120,50 240,10 360,35 C380,40 390,25 400,30 L400,60 L0,60 Z"/></svg>
+              </div>
+              <div class="project__body">
+                <span class="project__tag">Design</span>
+                <h3>Личный сайт</h3>
+                <p>Волнистый чёрно-белый one-page.</p>
+                <a href="#">Подробнее →</a>
+              </div>
+            </article>
+            <article class="project">
+              <div class="project__top">
+                <img class="project__img" src="assets/project-wip.png" alt="Следующий проект" />
+                <svg viewBox="0 0 400 60" preserveAspectRatio="none"><path fill="#1a1a1a" d="M0,40 C80,10 200,50 300,20 C350,10 380,45 400,35 L400,60 L0,60 Z"/></svg>
+              </div>
+              <div class="project__body">
+                <span class="project__tag">WIP</span>
+                <h3>Следующий проект</h3>
+                <p>Скоро здесь появится новая работа.</p>
+                <a href="#">Скоро →</a>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONTACT -->
+      <section id="contact" class="contact">
+        <div class="contact__wave-bg" aria-hidden="true">
+          <svg viewBox="0 0 1440 200"><path fill="#fff" d="M0,100 C360,20 720,180 1080,80 C1260,40 1380,120 1440,100 L1440,200 L0,200 Z"/></svg>
+        </div>
+        <div class="contact__inner">
+          <p class="section__label">Связаться</p>
+          <h2 class="contact__title">Давай поработаем</h2>
+          <p class="contact__sub">Открыт к коллаборациям и интересным идеям.</p>
+          <div class="contact__links">
+            <a class="contact__link" href="mailto:uqrcqoijoh@rambler.ru">
+              <span>✉</span> <strong>uqrcqoijoh@rambler.ru</strong>
+            </a>
+            <a class="contact__link" href="https://github.com/wavetop865-gif" target="_blank" rel="noopener">
+              <span>⌘</span> <strong>wavetop865-gif</strong>
+            </a>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      <p>© 2025 Malo Paul — wavy monochrome</p>
+    </footer>
+
+  </div>
+</body>
+</html>
