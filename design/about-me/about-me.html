@@ -45,18 +45,45 @@
 
     .bg-waves svg {
       position: absolute;
-      width: 140%;
-      left: -20%;
+      width: 200%;
+      left: -50%;
       opacity: 0.07;
+      will-change: transform;
     }
 
-    .bg-waves svg:nth-child(1) { top: -5%; animation: drift 18s ease-in-out infinite; }
-    .bg-waves svg:nth-child(2) { top: 30%; animation: drift 22s ease-in-out infinite reverse; opacity: 0.05; }
-    .bg-waves svg:nth-child(3) { bottom: -10%; animation: drift 20s ease-in-out infinite; opacity: 0.06; }
+    .bg-waves svg:nth-child(1) {
+      top: -8%;
+      animation: wave-drift-1 14s ease-in-out infinite;
+    }
 
-    @keyframes drift {
-      0%, 100% { transform: translateX(0) scaleY(1); }
-      50% { transform: translateX(3%) scaleY(1.04); }
+    .bg-waves svg:nth-child(2) {
+      top: 28%;
+      opacity: 0.05;
+      animation: wave-drift-2 18s ease-in-out infinite;
+    }
+
+    .bg-waves svg:nth-child(3) {
+      bottom: -12%;
+      opacity: 0.06;
+      animation: wave-drift-3 16s ease-in-out infinite;
+    }
+
+    @keyframes wave-drift-1 {
+      0%, 100% { transform: translateX(0) translateY(0) scaleY(1); }
+      25% { transform: translateX(-4%) translateY(12px) scaleY(1.03); }
+      50% { transform: translateX(-8%) translateY(0) scaleY(1.06); }
+      75% { transform: translateX(-4%) translateY(-10px) scaleY(1.02); }
+    }
+
+    @keyframes wave-drift-2 {
+      0%, 100% { transform: translateX(-6%) translateY(0) scaleY(1); }
+      33% { transform: translateX(0) translateY(-14px) scaleY(1.04); }
+      66% { transform: translateX(6%) translateY(8px) scaleY(0.98); }
+    }
+
+    @keyframes wave-drift-3 {
+      0%, 100% { transform: translateX(4%) translateY(0) scaleY(1); }
+      50% { transform: translateX(-6%) translateY(16px) scaleY(1.05); }
     }
 
     .wrap { position: relative; z-index: 1; }
@@ -66,15 +93,42 @@
       width: 100%;
       line-height: 0;
       overflow: hidden;
-    }
-
-    .wave-divider svg {
-      display: block;
-      width: 100%;
       height: 80px;
+      position: relative;
     }
 
-    .wave-divider--flip svg { transform: scaleY(-1); }
+    .wave-divider__track {
+      display: flex;
+      width: 200%;
+      height: 80px;
+      animation: wave-flow 10s linear infinite;
+      will-change: transform;
+    }
+
+    .wave-divider__track svg {
+      display: block;
+      width: 50%;
+      height: 80px;
+      flex-shrink: 0;
+    }
+
+    .wave-divider--flip .wave-divider__track {
+      animation: wave-flow-reverse 12s linear infinite;
+    }
+
+    .wave-divider--slow .wave-divider__track {
+      animation-duration: 16s;
+    }
+
+    @keyframes wave-flow {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    @keyframes wave-flow-reverse {
+      0% { transform: translateX(-50%); }
+      100% { transform: translateX(0); }
+    }
 
     /* ===== HEADER ===== */
     .header {
@@ -493,6 +547,15 @@
     .skill__wave {
       width: 60px; height: 30px;
       margin: 0 auto 1.25rem;
+      animation: skill-wave-bob 3s ease-in-out infinite;
+    }
+
+    .skill:nth-child(2) .skill__wave { animation-delay: -1s; }
+    .skill:nth-child(3) .skill__wave { animation-delay: -2s; }
+
+    @keyframes skill-wave-bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
     }
 
     .skill h3 {
@@ -558,10 +621,19 @@
       position: absolute;
       bottom: -2px;
       left: 0;
-      width: 100%;
+      width: 200%;
       height: 60px;
       z-index: 2;
       pointer-events: none;
+      animation: project-wave 6s ease-in-out infinite;
+    }
+
+    .project:nth-child(2) .project__top svg { animation-delay: -2s; }
+    .project:nth-child(3) .project__top svg { animation-delay: -4s; }
+
+    @keyframes project-wave {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(-12%); }
     }
 
     .project__body { padding: 1.25rem 1.4rem 1.5rem; }
@@ -616,9 +688,26 @@
 
     .contact__wave-bg svg {
       position: absolute;
-      width: 200%;
-      left: -50%;
-      top: 20%;
+      width: 220%;
+      left: -60%;
+      top: 10%;
+      animation: contact-wave 20s ease-in-out infinite;
+      will-change: transform;
+    }
+
+    @keyframes contact-wave {
+      0%, 100% { transform: translateX(0) translateY(0); }
+      50% { transform: translateX(8%) translateY(-20px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .bg-waves svg,
+      .wave-divider__track,
+      .skill__wave,
+      .project__top svg,
+      .contact__wave-bg svg {
+        animation: none !important;
+      }
     }
 
     .contact__inner {
@@ -750,9 +839,14 @@
 
       <!-- WAVE: black → white -->
       <div class="wave-divider">
-        <svg viewBox="0 0 1440 80" preserveAspectRatio="none">
-          <path fill="#e6e6ea" d="M0,40 C240,80 480,0 720,40 C960,80 1200,0 1440,40 L1440,80 L0,80 Z"/>
-        </svg>
+        <div class="wave-divider__track">
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none">
+            <path fill="#e6e6ea" d="M0,40 C240,80 480,0 720,40 C960,80 1200,0 1440,40 L1440,80 L0,80 Z"/>
+          </svg>
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none" aria-hidden="true">
+            <path fill="#e6e6ea" d="M0,40 C240,80 480,0 720,40 C960,80 1200,0 1440,40 L1440,80 L0,80 Z"/>
+          </svg>
+        </div>
       </div>
 
       <!-- ABOUT (white section) -->
@@ -795,9 +889,14 @@
 
       <!-- WAVE: white → dark -->
       <div class="wave-divider wave-divider--flip">
-        <svg viewBox="0 0 1440 80" preserveAspectRatio="none">
-          <path fill="#0d0d0d" d="M0,40 C360,0 720,80 1080,40 C1260,20 1380,60 1440,40 L1440,80 L0,80 Z"/>
-        </svg>
+        <div class="wave-divider__track">
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none" style="transform:scaleY(-1)">
+            <path fill="#0d0d0d" d="M0,40 C360,0 720,80 1080,40 C1260,20 1380,60 1440,40 L1440,80 L0,80 Z"/>
+          </svg>
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none" style="transform:scaleY(-1)" aria-hidden="true">
+            <path fill="#0d0d0d" d="M0,40 C360,0 720,80 1080,40 C1260,20 1380,60 1440,40 L1440,80 L0,80 Z"/>
+          </svg>
+        </div>
       </div>
 
       <!-- STORY (dark section) -->
@@ -839,10 +938,15 @@
       </section>
 
       <!-- WAVE: dark → white -->
-      <div class="wave-divider">
-        <svg viewBox="0 0 1440 80" preserveAspectRatio="none">
-          <path fill="#e6e6ea" d="M0,50 C300,10 600,70 900,30 C1100,10 1300,60 1440,40 L1440,80 L0,80 Z"/>
-        </svg>
+      <div class="wave-divider wave-divider--slow">
+        <div class="wave-divider__track">
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none">
+            <path fill="#e6e6ea" d="M0,50 C300,10 600,70 900,30 C1100,10 1300,60 1440,40 L1440,80 L0,80 Z"/>
+          </svg>
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none" aria-hidden="true">
+            <path fill="#e6e6ea" d="M0,50 C300,10 600,70 900,30 C1100,10 1300,60 1440,40 L1440,80 L0,80 Z"/>
+          </svg>
+        </div>
       </div>
 
       <!-- SKILLS (white section) -->
@@ -886,10 +990,15 @@
       </section>
 
       <!-- WAVE: white → dark -->
-      <div class="wave-divider wave-divider--flip">
-        <svg viewBox="0 0 1440 80" preserveAspectRatio="none">
-          <path fill="#0d0d0d" d="M0,30 C240,70 480,10 720,50 C960,80 1200,20 1440,50 L1440,80 L0,80 Z"/>
-        </svg>
+      <div class="wave-divider wave-divider--flip wave-divider--slow">
+        <div class="wave-divider__track">
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none" style="transform:scaleY(-1)">
+            <path fill="#0d0d0d" d="M0,30 C240,70 480,10 720,50 C960,80 1200,20 1440,50 L1440,80 L0,80 Z"/>
+          </svg>
+          <svg viewBox="0 0 1440 80" preserveAspectRatio="none" style="transform:scaleY(-1)" aria-hidden="true">
+            <path fill="#0d0d0d" d="M0,30 C240,70 480,10 720,50 C960,80 1200,20 1440,50 L1440,80 L0,80 Z"/>
+          </svg>
+        </div>
       </div>
 
       <!-- PROJECTS (dark section) -->
