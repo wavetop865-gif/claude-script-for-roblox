@@ -74,7 +74,7 @@ local I18N = {
 		errorParse  = "Не удалось разобрать ответ",
 		done        = "Готово",
 		chars       = "симв.",
-		hint        = "Enter — перевести · Esc — скрыть · RightShift — меню",
+		hint        = "Enter — перевести · тяни шапку · RightShift — меню",
 	},
 	en = {
 		brand       = "LINGO",
@@ -98,7 +98,7 @@ local I18N = {
 		errorParse  = "Could not parse response",
 		done        = "Done",
 		chars       = "chars",
-		hint        = "Enter — translate · Esc — hide · RightShift — menu",
+		hint        = "Enter — translate · drag header · RightShift — menu",
 	},
 	ua = {
 		brand       = "LINGO",
@@ -122,7 +122,7 @@ local I18N = {
 		errorParse  = "Не вдалося розібрати відповідь",
 		done        = "Готово",
 		chars       = "симв.",
-		hint        = "Enter — перекласти · Esc — сховати · RightShift — меню",
+		hint        = "Enter — перекласти · тягни шапку · RightShift — меню",
 	},
 }
 
@@ -210,17 +210,21 @@ local function makeDraggable(handle: GuiObject, target: GuiObject)
 	local startMouse: Vector3
 	local startPos: UDim2
 
+	handle.Active = true
+
 	handle.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
 			startMouse = input.Position
 			startPos = target.Position
-			input.Changed:Connect(function()
-				if input.UserInputState == Enum.UserInputState.End then
-					dragging = false
-				end
-			end)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
 		end
 	end)
 
@@ -247,7 +251,7 @@ local function makeAmbient(parent: Frame)
 		ClipsDescendants = true,
 		ZIndex = 0,
 	})
-	corner(16, layer)
+	corner(22, layer)
 
 	local orbs = {}
 	for i = 1, 5 do
@@ -420,16 +424,6 @@ local gui = new("ScreenGui", {
 	DisplayOrder = 100,
 })
 
--- Soft vignette
-local vignette = new("Frame", {
-	Parent = gui,
-	Size = UDim2.fromScale(1, 1),
-	BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-	BackgroundTransparency = 0.72,
-	BorderSizePixel = 0,
-	ZIndex = 0,
-})
-
 local root = new("Frame", {
 	Name = "Root",
 	Parent = gui,
@@ -439,17 +433,43 @@ local root = new("Frame", {
 	BackgroundColor3 = THEME.bg,
 	BorderSizePixel = 0,
 	ClipsDescendants = true,
+	Active = true,
 	ZIndex = 1,
 })
-corner(16, root)
-stroke(THEME.stroke, 1, root)
+corner(22, root)
+local rootStroke = stroke(THEME.stroke, 1.5, root)
+rootStroke.Transparency = 0.15
+
+-- Soft outer glow ring
+local glow = new("Frame", {
+	Name = "Glow",
+	Parent = gui,
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromOffset(572, 532),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 0,
+})
+corner(26, glow)
+local glowStroke = stroke(THEME.accent, 2, glow)
+glowStroke.Transparency = 0.82
+
+-- Keep glow locked to root while dragging / resizing
+RunService.RenderStepped:Connect(function()
+	glow.Position = root.Position
+	glow.Size = UDim2.fromOffset(root.AbsoluteSize.X + 12, root.AbsoluteSize.Y + 12)
+	glow.Visible = root.Visible
+end)
 
 local _ambientConn = makeAmbient(root)
 
--- Top accent line
+-- Top accent bar (rounded pill look)
 local accentLine = new("Frame", {
 	Parent = root,
-	Size = UDim2.new(1, 0, 0, 2),
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 0),
+	Size = UDim2.new(1, 0, 0, 3),
 	BackgroundColor3 = THEME.accent,
 	BorderSizePixel = 0,
 	ZIndex = 5,
@@ -463,22 +483,58 @@ new("UIGradient", {
 	}),
 })
 
--- Header
+-- Header (drag zone)
 local header = new("Frame", {
 	Parent = root,
-	Size = UDim2.new(1, 0, 0, 56),
+	Size = UDim2.new(1, 0, 0, 60),
 	BackgroundColor3 = THEME.panel,
-	BackgroundTransparency = 0.15,
+	BackgroundTransparency = 0.05,
+	BorderSizePixel = 0,
+	Active = true,
+	ZIndex = 2,
+})
+corner(22, header)
+-- Squash bottom corners so only top of window looks rounded on header
+new("Frame", {
+	Parent = header,
+	Position = UDim2.new(0, 0, 1, -14),
+	Size = UDim2.new(1, 0, 0, 14),
+	BackgroundColor3 = THEME.panel,
+	BackgroundTransparency = 0.05,
 	BorderSizePixel = 0,
 	ZIndex = 2,
 })
+new("UIGradient", {
+	Parent = header,
+	Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(22, 32, 40)),
+		ColorSequenceKeypoint.new(1, THEME.panel),
+	}),
+	Rotation = 90,
+})
+
+-- Drag grip dots (visual cue)
+local grip = new("Frame", {
+	Name = "Grip",
+	Parent = header,
+	AnchorPoint = Vector2.new(0.5, 0),
+	Position = UDim2.new(0.5, 0, 0, 6),
+	Size = UDim2.fromOffset(36, 4),
+	BackgroundColor3 = THEME.textMuted,
+	BackgroundTransparency = 0.35,
+	BorderSizePixel = 0,
+	ZIndex = 5,
+})
+corner(99, grip)
+
 makeDraggable(header, root)
+makeDraggable(grip, root)
 
 local brand = new("TextLabel", {
 	Name = "Brand",
 	Parent = header,
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(18, 8),
+	Position = UDim2.fromOffset(18, 14),
 	Size = UDim2.fromOffset(200, 24),
 	Font = THEME.fontBold,
 	TextSize = 20,
@@ -488,11 +544,22 @@ local brand = new("TextLabel", {
 	ZIndex = 3,
 })
 
+-- Accent dot next to brand
+local brandDot = new("Frame", {
+	Parent = header,
+	Position = UDim2.fromOffset(96, 22),
+	Size = UDim2.fromOffset(7, 7),
+	BackgroundColor3 = THEME.accent,
+	BorderSizePixel = 0,
+	ZIndex = 3,
+})
+corner(99, brandDot)
+
 local tagline = new("TextLabel", {
 	Name = "Tagline",
 	Parent = header,
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(18, 30),
+	Position = UDim2.fromOffset(18, 36),
 	Size = UDim2.fromOffset(220, 18),
 	Font = THEME.fontLight,
 	TextSize = 12,
@@ -507,7 +574,7 @@ local uiChipRow = new("Frame", {
 	Name = "UiLangs",
 	Parent = header,
 	AnchorPoint = Vector2.new(1, 0.5),
-	Position = UDim2.new(1, -52, 0.5, 0),
+	Position = UDim2.new(1, -52, 0.5, 4),
 	Size = UDim2.fromOffset(150, 28),
 	BackgroundTransparency = 1,
 	ZIndex = 3,
@@ -525,8 +592,8 @@ local uiChips: {[string]: TextButton} = {}
 local closeBtn = new("TextButton", {
 	Parent = header,
 	AnchorPoint = Vector2.new(1, 0.5),
-	Position = UDim2.new(1, -14, 0.5, 0),
-	Size = UDim2.fromOffset(28, 28),
+	Position = UDim2.new(1, -14, 0.5, 4),
+	Size = UDim2.fromOffset(30, 30),
 	BackgroundColor3 = THEME.card,
 	Text = "×",
 	Font = THEME.fontBold,
@@ -535,14 +602,14 @@ local closeBtn = new("TextButton", {
 	AutoButtonColor = false,
 	ZIndex = 4,
 })
-corner(8, closeBtn)
+corner(10, closeBtn)
 stroke(THEME.strokeSoft, 1, closeBtn)
 
 -- Body
 local body = new("Frame", {
 	Parent = root,
-	Position = UDim2.fromOffset(0, 56),
-	Size = UDim2.new(1, 0, 1, -56),
+	Position = UDim2.fromOffset(0, 60),
+	Size = UDim2.new(1, 0, 1, -60),
 	BackgroundTransparency = 1,
 	ZIndex = 2,
 })
@@ -566,7 +633,7 @@ local function makeLangPicker(parent: Frame, labelKey: string, side: string)
 		BorderSizePixel = 0,
 		ZIndex = 3,
 	})
-	corner(10, box)
+	corner(14, box)
 	stroke(THEME.strokeSoft, 1, box)
 
 	local lbl = new("TextLabel", {
@@ -630,7 +697,7 @@ local swapBtn = new("TextButton", {
 	AutoButtonColor = false,
 	ZIndex = 5,
 })
-corner(12, swapBtn)
+corner(14, swapBtn)
 stroke(THEME.stroke, 1, swapBtn)
 
 -- Input card
@@ -642,7 +709,7 @@ local inputCard = new("Frame", {
 	BorderSizePixel = 0,
 	ZIndex = 3,
 })
-corner(12, inputCard)
+corner(16, inputCard)
 stroke(THEME.strokeSoft, 1, inputCard)
 
 local inputBox = new("TextBox", {
@@ -689,7 +756,7 @@ local outputCard = new("Frame", {
 	BorderSizePixel = 0,
 	ZIndex = 3,
 })
-corner(12, outputCard)
+corner(16, outputCard)
 local outStroke = stroke(THEME.strokeSoft, 1, outputCard)
 
 local outputLabel = new("TextLabel", {
@@ -736,7 +803,7 @@ local function makeAction(text: string, primary: boolean?, order: number?): Text
 		LayoutOrder = order or 1,
 		ZIndex = 4,
 	})
-	corner(10, btn)
+	corner(14, btn)
 	if not primary then stroke(THEME.strokeSoft, 1, btn) end
 	btn.MouseEnter:Connect(function()
 		tween(btn, THEME.fast, {
@@ -844,7 +911,7 @@ local dropdown = new("ScrollingFrame", {
 	ZIndex = 21,
 	ClipsDescendants = true,
 })
-corner(10, dropdown)
+corner(14, dropdown)
 stroke(THEME.stroke, 1, dropdown)
 pad(6, 6, 6, 6, dropdown)
 local dropLayout = new("UIListLayout", {
@@ -888,7 +955,7 @@ local function openDropdown(which: string, anchor: Frame)
 			LayoutOrder = order,
 			ZIndex = 22,
 		})
-		corner(6, item)
+		corner(8, item)
 		item.MouseEnter:Connect(function()
 			item.BackgroundTransparency = 0
 			item.BackgroundColor3 = THEME.cardHover
@@ -978,7 +1045,7 @@ local function refreshHistory()
 			LayoutOrder = #state.history - i,
 			ZIndex = 4,
 		})
-		corner(8, chip)
+		corner(10, chip)
 		stroke(THEME.strokeSoft, 1, chip)
 		chip.MouseButton1Click:Connect(function()
 			inputBox.Text = h.src
@@ -1034,7 +1101,7 @@ for i, code in ipairs(UI_LANGS) do
 		LayoutOrder = i,
 		ZIndex = 4,
 	})
-	corner(7, chip)
+	corner(9, chip)
 	stroke(THEME.strokeSoft, 1, chip)
 	chip.MouseButton1Click:Connect(function()
 		state.uiLang = code
@@ -1202,10 +1269,10 @@ end)
 local function setVisible(v: boolean)
 	state.visible = v
 	root.Visible = v
-	vignette.Visible = v
+	glow.Visible = v
 	if v then
 		root.Size = UDim2.fromOffset(520, 480)
-		root.BackgroundTransparency = 0.4
+		root.BackgroundTransparency = 0.25
 		tween(root, THEME.slow, {
 			Size = UDim2.fromOffset(560, 520),
 			BackgroundTransparency = 0,
@@ -1242,16 +1309,14 @@ end)
 
 -- Entrance animation
 root.Size = UDim2.fromOffset(480, 440)
-root.BackgroundTransparency = 0.5
-vignette.BackgroundTransparency = 1
+root.BackgroundTransparency = 0.35
 tween(root, THEME.slow, {
 	Size = UDim2.fromOffset(560, 520),
 	BackgroundTransparency = 0,
 })
-tween(vignette, THEME.slow, { BackgroundTransparency = 0.72 })
 
 applyUiLang()
 setStatus("")
 
-print("[LINGO] Translator loaded · RightShift to toggle · UI: RU/EN/UA")
+print("[LINGO] Translator loaded · RightShift to toggle · drag header to move")
 return gui
