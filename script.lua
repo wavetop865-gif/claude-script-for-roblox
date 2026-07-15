@@ -444,7 +444,7 @@ local root = new("Frame", {
 corner(16, root)
 stroke(THEME.stroke, 1, root)
 
-local ambientConn = makeAmbient(root)
+local _ambientConn = makeAmbient(root)
 
 -- Top accent line
 local accentLine = new("Frame", {
