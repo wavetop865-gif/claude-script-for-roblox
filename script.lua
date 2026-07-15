@@ -405,10 +405,10 @@ local function textLen(s: string): number
 	return n or #s
 end
 
--- Soft mesh blobs (atmosphere, not clutter)
+-- Plasma background (flowing ribbons + low-res plasma field — no circles)
 local function makeAtmosphere(parent: Frame)
 	local layer = new("Frame", {
-		Name = "Atmosphere",
+		Name = "Plasma",
 		Parent = parent,
 		Size = UDim2.fromScale(1, 1),
 		BackgroundTransparency = 1,
@@ -417,42 +417,140 @@ local function makeAtmosphere(parent: Frame)
 	})
 	corner(24, layer)
 
-	local blobs = {
-		{ c = THEME.accentDeep, t = 0.93, x = -40, y = -30, s = 220, vx = 6, vy = 4 },
-		{ c = Color3.fromRGB(70, 90, 140), t = 0.94, x = 340, y = 280, s = 260, vx = -5, vy = -3 },
-		{ c = THEME.accent, t = 0.96, x = 200, y = 80, s = 160, vx = 3, vy = -5 },
+	-- Base wash
+	local wash = new("Frame", {
+		Parent = layer,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = THEME.bg,
+		BackgroundTransparency = 0.35,
+		BorderSizePixel = 0,
+		ZIndex = 0,
+	})
+	local washGrad = new("UIGradient", {
+		Parent = wash,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(18, 14, 22)),
+			ColorSequenceKeypoint.new(0.45, Color3.fromRGB(40, 22, 28)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(14, 18, 32)),
+		}),
+		Rotation = 35,
+	})
+
+	-- Soft plasma ribbons (elongated bands, not orbs)
+	local ribbons = {}
+	local ribbonDefs = {
+		{ y = 0.08, h = 0.22, rot = -8,  c1 = THEME.accentDeep, c2 = Color3.fromRGB(80, 40, 90), t = 0.82 },
+		{ y = 0.38, h = 0.28, rot = 12,  c1 = Color3.fromRGB(50, 70, 130), c2 = THEME.accent, t = 0.86 },
+		{ y = 0.62, h = 0.24, rot = -14, c1 = THEME.accent, c2 = Color3.fromRGB(90, 50, 70), t = 0.84 },
+		{ y = 0.82, h = 0.2,  rot = 6,   c1 = Color3.fromRGB(35, 50, 90), c2 = THEME.accentDeep, t = 0.88 },
 	}
-	local objs = {}
-	for _, b in ipairs(blobs) do
-		local f = new("Frame", {
+	for i, d in ipairs(ribbonDefs) do
+		local band = new("Frame", {
 			Parent = layer,
-			Size = UDim2.fromOffset(b.s, b.s),
-			Position = UDim2.fromOffset(b.x, b.y),
-			BackgroundColor3 = b.c,
-			BackgroundTransparency = b.t,
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, d.y, 0),
+			Size = UDim2.new(1.35, 0, d.h, 0),
+			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			BackgroundTransparency = d.t,
 			BorderSizePixel = 0,
+			Rotation = d.rot,
 			ZIndex = 0,
 		})
-		corner(999, f)
-		table.insert(objs, {
-			obj = f, x = b.x, y = b.y, vx = b.vx, vy = b.vy,
-			baseT = b.t, phase = math.random() * 6.28, s = b.s,
+		corner(18, band)
+		local g = new("UIGradient", {
+			Parent = band,
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, d.c1),
+				ColorSequenceKeypoint.new(0.5, d.c2),
+				ColorSequenceKeypoint.new(1, d.c1),
+			}),
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.55),
+				NumberSequenceKeypoint.new(0.5, 0.05),
+				NumberSequenceKeypoint.new(1, 0.55),
+			}),
+		})
+		table.insert(ribbons, {
+			band = band,
+			grad = g,
+			baseY = d.y,
+			baseRot = d.rot,
+			baseT = d.t,
+			phase = i * 1.7,
+			speed = 0.35 + i * 0.08,
 		})
 	end
 
-	return RunService.Heartbeat:Connect(function(dt)
-		local w = math.max(layer.AbsoluteSize.X, 1)
-		local h = math.max(layer.AbsoluteSize.Y, 1)
-		for _, o in ipairs(objs) do
-			o.x += o.vx * dt
-			o.y += o.vy * dt
-			o.phase += dt * 0.55
-			if o.x < -o.s then o.x = w end
-			if o.x > w then o.x = -o.s end
-			if o.y < -o.s then o.y = h end
-			if o.y > h then o.y = -o.s end
-			o.obj.BackgroundTransparency = o.baseT + math.sin(o.phase) * 0.02
-			o.obj.Position = UDim2.fromOffset(math.floor(o.x), math.floor(o.y))
+	-- Low-res plasma grid (soft squares)
+	local COLS, ROWS = 10, 8
+	local grid = new("Frame", {
+		Parent = layer,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ZIndex = 0,
+	})
+	local cells = {}
+	for row = 0, ROWS - 1 do
+		for col = 0, COLS - 1 do
+			local cell = new("Frame", {
+				Parent = grid,
+				Size = UDim2.new(1 / COLS, 1, 1 / ROWS, 1),
+				Position = UDim2.new(col / COLS, 0, row / ROWS, 0),
+				BackgroundColor3 = THEME.accent,
+				BackgroundTransparency = 0.94,
+				BorderSizePixel = 0,
+				ZIndex = 0,
+			})
+			corner(4, cell)
+			table.insert(cells, {
+				obj = cell,
+				nx = col / (COLS - 1),
+				ny = row / (ROWS - 1),
+			})
+		end
+	end
+
+	local t0 = os.clock()
+	local pal = {
+		Color3.fromRGB(28, 18, 40),
+		Color3.fromRGB(70, 35, 55),
+		THEME.accentDeep,
+		THEME.accent,
+		Color3.fromRGB(90, 110, 180),
+		Color3.fromRGB(40, 55, 100),
+	}
+
+	local function plasmaColor(v: number): Color3
+		-- v in 0..1 → palette lerp
+		local scaled = math.clamp(v, 0, 0.999) * (#pal - 1)
+		local i = math.floor(scaled) + 1
+		local f = scaled - math.floor(scaled)
+		local a, b = pal[i], pal[math.min(i + 1, #pal)]
+		return a:Lerp(b, f)
+	end
+
+	return RunService.Heartbeat:Connect(function()
+		local t = (os.clock() - t0) * 0.85
+
+		washGrad.Rotation = 35 + math.sin(t * 0.25) * 18
+
+		for _, r in ipairs(ribbons) do
+			local wave = math.sin(t * r.speed + r.phase)
+			r.band.Rotation = r.baseRot + wave * 10
+			r.band.Position = UDim2.new(0.5 + math.sin(t * 0.2 + r.phase) * 0.06, 0, r.baseY + wave * 0.03, 0)
+			r.band.BackgroundTransparency = r.baseT + wave * 0.04
+			r.grad.Offset = Vector2.new(math.sin(t * 0.4 + r.phase) * 0.35, 0)
+		end
+
+		for _, c in ipairs(cells) do
+			local x, y = c.nx, c.ny
+			local v = math.sin(x * 6.2 + t)
+				+ math.sin(y * 5.1 + t * 1.25)
+				+ math.sin((x + y) * 4.4 + t * 0.8)
+				+ math.sin(math.sqrt(x * x + y * y) * 7.0 + t * 1.1)
+			v = (v + 4) / 8 -- 0..1
+			c.obj.BackgroundColor3 = plasmaColor(v)
+			c.obj.BackgroundTransparency = 0.88 + (1 - v) * 0.08
 		end
 	end)
 end
