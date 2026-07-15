@@ -50,6 +50,10 @@ local THEME = {
 }
 
 local WIN_W, WIN_H = 580, 540
+local MIN_W, MIN_H = 420, 420
+local MAX_W, MAX_H = 1100, 900
+
+local winSize = { w = WIN_W, h = WIN_H }
 
 -- ============================================================
 -- i18n
@@ -77,7 +81,7 @@ local I18N = {
 		errorParse  = "Ошибка ответа",
 		done        = "Готово",
 		chars       = "симв.",
-		hint        = "RightShift — скрыть · тяни шапку",
+		hint        = "тяни края · шапку · RightShift",
 	},
 	en = {
 		tagline     = "translator",
@@ -99,7 +103,7 @@ local I18N = {
 		errorParse  = "Bad response",
 		done        = "Done",
 		chars       = "chars",
-		hint        = "RightShift — hide · drag header",
+		hint        = "drag edges · header · RightShift",
 	},
 	ua = {
 		tagline     = "перекладач",
@@ -121,7 +125,7 @@ local I18N = {
 		errorParse  = "Помилка відповіді",
 		done        = "Готово",
 		chars       = "симв.",
-		hint        = "RightShift — сховати · тягни шапку",
+		hint        = "тягни краї · шапку · RightShift",
 	},
 }
 
@@ -235,6 +239,165 @@ local function makeDraggable(handle: GuiObject, target: GuiObject)
 			)
 		end
 	end)
+end
+
+-- edges: "l","r","t","b","tl","tr","bl","br"
+local function makeResizeHandle(parent: Frame, target: Frame, edge: string, sizeState: {w: number, h: number})
+	local EDGE = 8
+	local CORNER = 14
+
+	local props: {[string]: any} = {
+		Parent = parent,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Active = true,
+		ZIndex = 50,
+		Name = "Resize_" .. edge,
+	}
+
+	if edge == "l" then
+		props.Size = UDim2.new(0, EDGE, 1, -CORNER * 2)
+		props.Position = UDim2.new(0, 0, 0, CORNER)
+		props.AnchorPoint = Vector2.new(0, 0)
+	elseif edge == "r" then
+		props.Size = UDim2.new(0, EDGE, 1, -CORNER * 2)
+		props.Position = UDim2.new(1, 0, 0, CORNER)
+		props.AnchorPoint = Vector2.new(1, 0)
+	elseif edge == "t" then
+		props.Size = UDim2.new(1, -CORNER * 2, 0, EDGE)
+		props.Position = UDim2.new(0, CORNER, 0, 0)
+		props.AnchorPoint = Vector2.new(0, 0)
+	elseif edge == "b" then
+		props.Size = UDim2.new(1, -CORNER * 2, 0, EDGE)
+		props.Position = UDim2.new(0, CORNER, 1, 0)
+		props.AnchorPoint = Vector2.new(0, 1)
+	elseif edge == "tl" then
+		props.Size = UDim2.fromOffset(CORNER, CORNER)
+		props.Position = UDim2.fromScale(0, 0)
+	elseif edge == "tr" then
+		props.Size = UDim2.fromOffset(CORNER, CORNER)
+		props.Position = UDim2.new(1, 0, 0, 0)
+		props.AnchorPoint = Vector2.new(1, 0)
+	elseif edge == "bl" then
+		props.Size = UDim2.fromOffset(CORNER, CORNER)
+		props.Position = UDim2.new(0, 0, 1, 0)
+		props.AnchorPoint = Vector2.new(0, 1)
+	elseif edge == "br" then
+		props.Size = UDim2.fromOffset(CORNER, CORNER)
+		props.Position = UDim2.new(1, 0, 1, 0)
+		props.AnchorPoint = Vector2.new(1, 1)
+	end
+
+	local handle = new("Frame", props)
+
+	-- Visible corner grip on bottom-right
+	if edge == "br" then
+		handle.BackgroundTransparency = 1
+		local g1 = new("Frame", {
+			Parent = handle,
+			AnchorPoint = Vector2.new(1, 1),
+			Position = UDim2.new(1, -5, 1, -5),
+			Size = UDim2.fromOffset(10, 2),
+			BackgroundColor3 = THEME.accent,
+			BackgroundTransparency = 0.35,
+			BorderSizePixel = 0,
+			ZIndex = 51,
+		})
+		corner(2, g1)
+		local g2 = new("Frame", {
+			Parent = handle,
+			AnchorPoint = Vector2.new(1, 1),
+			Position = UDim2.new(1, -5, 1, -5),
+			Size = UDim2.fromOffset(2, 10),
+			BackgroundColor3 = THEME.accent,
+			BackgroundTransparency = 0.35,
+			BorderSizePixel = 0,
+			ZIndex = 51,
+		})
+		corner(2, g2)
+	end
+
+	local resizing = false
+	local startMouse: Vector3
+	local startSize: Vector2
+	local startPos: UDim2
+	-- For top-left anchored windows we'd adjust differently.
+	-- Root uses AnchorPoint 0.5,0.5 — compensate position so the opposite edge stays put.
+
+	handle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			resizing = true
+			startMouse = input.Position
+			startSize = Vector2.new(target.AbsoluteSize.X, target.AbsoluteSize.Y)
+			startPos = target.Position
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			resizing = false
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if not resizing then return end
+		if input.UserInputType ~= Enum.UserInputType.MouseMovement
+			and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+
+		local d = input.Position - startMouse
+		local dw, dh = 0, 0
+
+		local hasL = edge == "l" or edge == "tl" or edge == "bl"
+		local hasR = edge == "r" or edge == "tr" or edge == "br"
+		local hasT = edge == "t" or edge == "tl" or edge == "tr"
+		local hasB = edge == "b" or edge == "bl" or edge == "br"
+
+		if hasR then
+			dw = d.X
+		elseif hasL then
+			dw = -d.X
+		end
+
+		if hasB then
+			dh = d.Y
+		elseif hasT then
+			dh = -d.Y
+		end
+
+		local nw = math.clamp(startSize.X + dw, MIN_W, MAX_W)
+		local nh = math.clamp(startSize.Y + dh, MIN_H, MAX_H)
+
+		local appliedDw = nw - startSize.X
+		local appliedDh = nh - startSize.Y
+
+		-- Keep the opposite edge fixed (root AnchorPoint is 0.5, 0.5)
+		local ox = 0
+		local oy = 0
+		if hasL then
+			ox = -appliedDw / 2
+		elseif hasR then
+			ox = appliedDw / 2
+		end
+		if hasT then
+			oy = -appliedDh / 2
+		elseif hasB then
+			oy = appliedDh / 2
+		end
+
+		sizeState.w = nw
+		sizeState.h = nh
+		target.Size = UDim2.fromOffset(nw, nh)
+		target.Position = UDim2.new(
+			startPos.X.Scale, startPos.X.Offset + ox,
+			startPos.Y.Scale, startPos.Y.Offset + oy
+		)
+	end)
+
+	return handle
 end
 
 local function textLen(s: string): number
@@ -432,6 +595,11 @@ local root = new("Frame", {
 })
 corner(24, root)
 stroke(THEME.line, 1, root, 0.25)
+
+-- Resize edges + corners (sides, top, bottom)
+for _, edge in ipairs({ "l", "r", "t", "b", "tl", "tr", "bl", "br" }) do
+	makeResizeHandle(root, root, edge, winSize)
+end
 
 RunService.RenderStepped:Connect(function()
 	halo.Position = root.Position
@@ -679,11 +847,18 @@ local swapBtn = new("TextButton", {
 corner(14, swapBtn)
 stroke(THEME.accent, 1.2, swapBtn, 0.55)
 
--- Text fields stack
-local inputCard = new("Frame", {
+-- Flexible fields area (grows when window is resized)
+local fields = new("Frame", {
 	Parent = body,
 	Position = UDim2.fromOffset(0, 68),
-	Size = UDim2.new(1, 0, 0, 128),
+	Size = UDim2.new(1, 0, 1, -200),
+	BackgroundTransparency = 1,
+	ZIndex = 4,
+})
+
+local inputCard = new("Frame", {
+	Parent = fields,
+	Size = UDim2.new(1, 0, 0.5, -6),
 	BackgroundColor3 = THEME.field,
 	BorderSizePixel = 0,
 	ZIndex = 4,
@@ -725,9 +900,9 @@ local charCount = new("TextLabel", {
 })
 
 local outputCard = new("Frame", {
-	Parent = body,
-	Position = UDim2.fromOffset(0, 208),
-	Size = UDim2.new(1, 0, 0, 128),
+	Parent = fields,
+	Position = UDim2.new(0, 0, 0.5, 6),
+	Size = UDim2.new(1, 0, 0.5, -6),
 	BackgroundColor3 = THEME.fieldAlt,
 	BorderSizePixel = 0,
 	ZIndex = 4,
@@ -763,10 +938,19 @@ local outputLabel = new("TextLabel", {
 	ZIndex = 5,
 })
 
+-- Footer (actions + history) pinned to bottom
+local footer = new("Frame", {
+	Parent = body,
+	AnchorPoint = Vector2.new(0, 1),
+	Position = UDim2.new(0, 0, 1, 0),
+	Size = UDim2.new(1, 0, 0, 120),
+	BackgroundTransparency = 1,
+	ZIndex = 4,
+})
+
 -- Actions
 local actionRow = new("Frame", {
-	Parent = body,
-	Position = UDim2.fromOffset(0, 350),
+	Parent = footer,
 	Size = UDim2.new(1, 0, 0, 46),
 	BackgroundTransparency = 1,
 	ZIndex = 4,
@@ -824,9 +1008,9 @@ corner(14, clearBtn)
 stroke(THEME.lineSoft, 1, clearBtn, 0.2)
 
 local statusLbl = new("TextLabel", {
-	Parent = body,
+	Parent = footer,
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(0, 404),
+	Position = UDim2.fromOffset(0, 52),
 	Size = UDim2.new(0.55, 0, 0, 16),
 	Font = THEME.fontLight,
 	TextSize = 12,
@@ -837,9 +1021,9 @@ local statusLbl = new("TextLabel", {
 })
 
 local hintLbl = new("TextLabel", {
-	Parent = body,
+	Parent = footer,
 	BackgroundTransparency = 1,
-	Position = UDim2.new(0.45, 0, 0, 404),
+	Position = UDim2.new(0.45, 0, 0, 52),
 	Size = UDim2.new(0.55, 0, 0, 16),
 	Font = THEME.fontLight,
 	TextSize = 11,
@@ -850,9 +1034,9 @@ local hintLbl = new("TextLabel", {
 })
 
 local histTitle = new("TextLabel", {
-	Parent = body,
+	Parent = footer,
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(0, 428),
+	Position = UDim2.fromOffset(0, 74),
 	Size = UDim2.new(1, 0, 0, 14),
 	Font = THEME.fontBold,
 	TextSize = 11,
@@ -863,8 +1047,8 @@ local histTitle = new("TextLabel", {
 })
 
 local histScroll = new("ScrollingFrame", {
-	Parent = body,
-	Position = UDim2.fromOffset(0, 446),
+	Parent = footer,
+	Position = UDim2.fromOffset(0, 90),
 	Size = UDim2.new(1, 0, 0, 30),
 	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
@@ -967,8 +1151,8 @@ local function openDropdown(which: string, anchor: GuiObject)
 	local abs = anchor.AbsolutePosition
 	local rootAbs = root.AbsolutePosition
 	dropdown.Position = UDim2.fromOffset(
-		math.clamp(abs.X - rootAbs.X, 12, WIN_W - 242),
-		math.clamp(abs.Y - rootAbs.Y + anchor.AbsoluteSize.Y + 6, 70, 260)
+		math.clamp(abs.X - rootAbs.X, 12, math.max(winSize.w - 242, 12)),
+		math.clamp(abs.Y - rootAbs.Y + anchor.AbsoluteSize.Y + 6, 70, math.max(winSize.h - 260, 70))
 	)
 	dropdown.Visible = true
 	dropOverlay.Visible = true
@@ -1249,10 +1433,11 @@ local function setVisible(v: boolean)
 	root.Visible = v
 	halo.Visible = v
 	if v then
-		root.Size = UDim2.fromOffset(WIN_W - 40, WIN_H - 36)
+		local w, h = winSize.w, winSize.h
+		root.Size = UDim2.fromOffset(w - 40, h - 36)
 		root.BackgroundTransparency = 0.2
 		tween(root, THEME.spring, {
-			Size = UDim2.fromOffset(WIN_W, WIN_H),
+			Size = UDim2.fromOffset(w, h),
 			BackgroundTransparency = 0,
 		})
 	end
@@ -1304,5 +1489,5 @@ tween(root, THEME.spring, {
 
 applyUiLang()
 setStatus("")
-print("[lingo] loaded · Ink & Apricot · RightShift to toggle")
+print("[lingo] loaded · resize edges/corners · RightShift to toggle")
 return gui
