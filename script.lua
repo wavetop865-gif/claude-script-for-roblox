@@ -47,6 +47,8 @@ local THEME = {
 	med  = TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
 	slow = TweenInfo.new(0.42, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
 	spring = TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+	soft = TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+	close = TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.In),
 }
 
 local WIN_W, WIN_H = 580, 540
@@ -254,6 +256,25 @@ local function bindPressFeel(btn: GuiObject, opts: {hoverScale: number?, pressSc
 	end)
 end
 
+-- Smooth drag across the screen (lerp follow + inertia)
+local dragSmooth = {
+	active = false,
+	goalX = 0,
+	goalY = 0,
+	curX = 0,
+	curY = 0,
+	velX = 0,
+	velY = 0,
+	scale = 0.5, -- Position scale component preserved
+	-- tuned feel
+	follow = 18,
+	friction = 8,
+}
+
+local function posFromSmooth(): UDim2
+	return UDim2.new(dragSmooth.scale, dragSmooth.curX, dragSmooth.scale, dragSmooth.curY)
+end
+
 local function makeDraggable(handle: GuiObject, target: GuiObject, onDragState: ((boolean) -> ())?)
 	handle.Active = true
 	handle.InputBegan:Connect(function(input)
@@ -266,7 +287,19 @@ local function makeDraggable(handle: GuiObject, target: GuiObject, onDragState: 
 		local moving = true
 		local moveConn: RBXScriptConnection
 		local endConn: RBXScriptConnection
+
+		dragSmooth.active = true
+		dragSmooth.scale = startPos.X.Scale
+		dragSmooth.curX = startPos.X.Offset
+		dragSmooth.curY = startPos.Y.Offset
+		dragSmooth.goalX = startPos.X.Offset
+		dragSmooth.goalY = startPos.Y.Offset
+		dragSmooth.velX = 0
+		dragSmooth.velY = 0
+
 		if onDragState then onDragState(true) end
+
+		local lastMouse = startMouse
 		moveConn = UserInputService.InputChanged:Connect(function(changed)
 			if not moving then return end
 			if changed.UserInputType ~= Enum.UserInputType.MouseMovement
@@ -274,15 +307,20 @@ local function makeDraggable(handle: GuiObject, target: GuiObject, onDragState: 
 				return
 			end
 			local d = changed.Position - startMouse
-			target.Position = UDim2.new(
-				startPos.X.Scale, startPos.X.Offset + d.X,
-				startPos.Y.Scale, startPos.Y.Offset + d.Y
-			)
+			dragSmooth.goalX = startPos.X.Offset + d.X
+			dragSmooth.goalY = startPos.Y.Offset + d.Y
+			-- approximate velocity from mouse delta
+			local md = changed.Position - lastMouse
+			dragSmooth.velX = md.X * 60
+			dragSmooth.velY = md.Y * 60
+			lastMouse = changed.Position
 		end)
+
 		endConn = UserInputService.InputEnded:Connect(function(ended)
 			if ended.UserInputType == Enum.UserInputType.MouseButton1
 				or ended.UserInputType == Enum.UserInputType.Touch then
 				moving = false
+				dragSmooth.active = false -- inertia takes over via vel
 				moveConn:Disconnect()
 				endConn:Disconnect()
 				if onDragState then onDragState(false) end
@@ -290,6 +328,36 @@ local function makeDraggable(handle: GuiObject, target: GuiObject, onDragState: 
 		end)
 	end)
 end
+
+-- Drive smooth position every frame
+RunService.RenderStepped:Connect(function(dt)
+	dt = math.clamp(dt, 0, 0.05)
+	local ds = dragSmooth
+	if ds.active then
+		local ax = (ds.goalX - ds.curX) * ds.follow
+		local ay = (ds.goalY - ds.curY) * ds.follow
+		ds.velX = ds.velX + (ax - ds.velX) * math.clamp(dt * 20, 0, 1)
+		ds.velY = ds.velY + (ay - ds.velY) * math.clamp(dt * 20, 0, 1)
+		ds.curX += ds.velX * dt
+		ds.curY += ds.velY * dt
+		-- also pull directly for snappy-smooth hybrid
+		ds.curX += (ds.goalX - ds.curX) * math.clamp(dt * ds.follow, 0, 1)
+		ds.curY += (ds.goalY - ds.curY) * math.clamp(dt * ds.follow, 0, 1)
+	elseif math.abs(ds.velX) > 2 or math.abs(ds.velY) > 2 then
+		ds.curX += ds.velX * dt
+		ds.curY += ds.velY * dt
+		local damp = math.exp(-ds.friction * dt)
+		ds.velX *= damp
+		ds.velY *= damp
+	else
+		return
+	end
+
+	-- apply to root if it exists later — set via callback
+	if dragSmooth.apply then
+		dragSmooth.apply(posFromSmooth())
+	end
+end)
 
 -- Visible arrow glyphs per edge
 local ARROW = {
@@ -855,6 +923,19 @@ local rootScale = Instance.new("UIScale")
 rootScale.Scale = 1
 rootScale.Parent = root
 
+dragSmooth.apply = function(pos: UDim2)
+	root.Position = pos
+end
+-- seed smooth state from current position
+do
+	local p = root.Position
+	dragSmooth.scale = p.X.Scale
+	dragSmooth.curX = p.X.Offset
+	dragSmooth.curY = p.Y.Offset
+	dragSmooth.goalX = p.X.Offset
+	dragSmooth.goalY = p.Y.Offset
+end
+
 local haloStroke = halo:FindFirstChildOfClass("UIStroke")
 
 -- Resize edges + corners (sides, top, bottom)
@@ -1229,8 +1310,82 @@ local outputLabel = new("TextLabel", {
 	TextColor3 = THEME.textMute,
 	Text = t("result"),
 	TextWrapped = true,
+	TextTransparency = 0,
 	ZIndex = 5,
 })
+
+local outRevealToken = 0
+local function cancelTextReveal()
+	outRevealToken += 1
+end
+
+local function revealText(label: TextLabel, full: string, color: Color3)
+	cancelTextReveal()
+	local token = outRevealToken
+	label.TextColor3 = color
+	label.TextTransparency = 0.55
+	label.Position = UDim2.fromOffset(16, 34)
+	label.Text = ""
+
+	tween(label, THEME.soft, {
+		Position = UDim2.fromOffset(16, 26),
+		TextTransparency = 0,
+	})
+
+	task.spawn(function()
+		-- Fast typewriter (batched for long strings)
+		local chars = {}
+		if utf8 and utf8.len(full) then
+			for _, code in utf8.codes(full) do
+				chars[#chars + 1] = utf8.char(code)
+			end
+		else
+			for i = 1, #full do
+				chars[i] = string.sub(full, i, i)
+			end
+		end
+		local total = #chars
+		if total == 0 then
+			if token == outRevealToken then label.Text = full end
+			return
+		end
+		local step = math.max(1, math.floor(total / 40))
+		local i = 0
+		while i < total do
+			if token ~= outRevealToken then return end
+			i = math.min(i + step, total)
+			label.Text = table.concat(chars, "", 1, i)
+			task.wait(0.012)
+		end
+		if token == outRevealToken then
+			label.Text = full
+			label.TextTransparency = 0
+		end
+	end)
+end
+
+local translatePulse = false
+local function setTranslatePulse(on: boolean)
+	translatePulse = on
+	if on then
+		task.spawn(function()
+			local dots = 0
+			while translatePulse do
+				dots = (dots % 3) + 1
+				outputLabel.Text = t("translating") .. string.rep(".", dots)
+				outputLabel.TextColor3 = THEME.textMute
+				outputLabel.TextTransparency = 0.15
+				tween(outStroke, THEME.fast, { Color = THEME.accent, Transparency = 0.4 })
+				task.wait(0.28)
+				if not translatePulse then break end
+				tween(outStroke, THEME.fast, { Color = THEME.lineSoft, Transparency = 0.1 })
+				task.wait(0.12)
+			end
+		end)
+	else
+		tween(outStroke, THEME.med, { Color = THEME.lineSoft, Transparency = 0.1 })
+	end
+end
 
 -- Footer (actions + history) pinned to bottom
 local footer = new("Frame", {
@@ -1512,8 +1667,7 @@ local function refreshHistory()
 		stroke(THEME.lineSoft, 1, chip, 0.25)
 		chip.MouseButton1Click:Connect(function()
 			inputBox.Text = h.src
-			outputLabel.Text = h.dst
-			outputLabel.TextColor3 = THEME.text
+			revealText(outputLabel, h.dst, THEME.text)
 			state.fromCode = h.from
 			state.toCode = h.to
 			fromPicker.Value.Text = h.from == "auto" and t("auto") or langName(h.from)
@@ -1604,21 +1758,25 @@ local function doTranslate()
 	state.busy = true
 	translateBtn.Text = t("translating")
 	setStatus(t("translating"), THEME.accent)
-	outputLabel.TextColor3 = THEME.textMute
+	cancelTextReveal()
+	setTranslatePulse(true)
 
 	task.spawn(function()
 		local ok, result, detected = translateText(text, state.fromCode, state.toCode)
 		state.busy = false
 		translateBtn.Text = t("translate")
+		setTranslatePulse(false)
 
 		if not ok then
 			setStatus(t(detected == "parse" and "errorParse" or "errorHttp"), THEME.danger)
 			pulseOutput(false)
+			outputLabel.Text = t(detected == "parse" and "errorParse" or "errorHttp")
+			outputLabel.TextColor3 = THEME.danger
+			outputLabel.TextTransparency = 0
 			return
 		end
 
-		outputLabel.Text = result
-		outputLabel.TextColor3 = THEME.text
+		revealText(outputLabel, result, THEME.text)
 		pulseOutput(true)
 
 		local fromShown = state.fromCode
@@ -1741,21 +1899,86 @@ closeBtn.MouseLeave:Connect(function()
 	tween(closeBtn, THEME.fast, { TextColor3 = THEME.textDim })
 end)
 
+local animatingVis = false
+
 local function setVisible(v: boolean)
-	state.visible = v
-	root.Visible = v
-	halo.Visible = v
-	if atm then atm.setEnabled(v) end
+	if animatingVis then return end
+	if v == state.visible and root.Visible == v then return end
+
 	if v then
+		-- OPEN
+		animatingVis = true
+		state.visible = true
+		root.Visible = true
+		halo.Visible = true
+		if atm then atm.setEnabled(true) end
+
 		local w, h = winSize.w, winSize.h
-		rootScale.Scale = 0.94
-		root.Size = UDim2.fromOffset(w - 40, h - 36)
-		root.BackgroundTransparency = 0.2
-		tween(rootScale, THEME.spring, { Scale = 1 })
+		local p = root.Position
+		root.Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset + 28)
+		rootScale.Scale = 0.88
+		root.BackgroundTransparency = 0.55
+		if haloStroke then haloStroke.Transparency = 1 end
+
+		-- fade text in
+		outputLabel.TextTransparency = 1
+		brand.TextTransparency = 1
+		tagline.TextTransparency = 1
+
 		tween(root, THEME.spring, {
 			Size = UDim2.fromOffset(w, h),
 			BackgroundTransparency = 0,
+			Position = p,
 		})
+		tween(rootScale, THEME.spring, { Scale = 1 })
+		if haloStroke then
+			tween(haloStroke, THEME.soft, { Transparency = 0.88 })
+		end
+		tween(brand, THEME.soft, { TextTransparency = 0 })
+		tween(tagline, THEME.soft, { TextTransparency = 0 })
+		tween(outputLabel, THEME.soft, { TextTransparency = 0 })
+
+		-- sync drag smooth to final pos
+		dragSmooth.curX = p.X.Offset
+		dragSmooth.curY = p.Y.Offset
+		dragSmooth.goalX = p.X.Offset
+		dragSmooth.goalY = p.Y.Offset
+		dragSmooth.velX = 0
+		dragSmooth.velY = 0
+
+		task.delay(0.45, function()
+			animatingVis = false
+		end)
+	else
+		-- CLOSE
+		animatingVis = true
+		state.visible = false
+		local p = root.Position
+		tween(rootScale, THEME.close, { Scale = 0.9 })
+		tween(root, THEME.close, {
+			BackgroundTransparency = 0.7,
+			Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset + 22),
+		})
+		if haloStroke then
+			tween(haloStroke, THEME.close, { Transparency = 1 })
+		end
+		tween(brand, THEME.close, { TextTransparency = 1 })
+		tween(tagline, THEME.close, { TextTransparency = 1 })
+		tween(outputLabel, THEME.close, { TextTransparency = 1 })
+
+		task.delay(0.3, function()
+			root.Visible = false
+			halo.Visible = false
+			if atm then atm.setEnabled(false) end
+			-- restore position for next open
+			root.Position = p
+			root.BackgroundTransparency = 0
+			rootScale.Scale = 1
+			brand.TextTransparency = 0
+			tagline.TextTransparency = 0
+			outputLabel.TextTransparency = 0
+			animatingVis = false
+		end)
 	end
 end
 
@@ -1795,15 +2018,37 @@ task.spawn(function()
 	end
 end)
 
--- Entrance
-root.Size = UDim2.fromOffset(WIN_W - 50, WIN_H - 40)
-root.BackgroundTransparency = 0.35
-tween(root, THEME.spring, {
-	Size = UDim2.fromOffset(WIN_W, WIN_H),
-	BackgroundTransparency = 0,
-})
+-- Entrance (same language as open)
+do
+	local p = root.Position
+	root.Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset + 36)
+	root.Size = UDim2.fromOffset(WIN_W - 40, WIN_H - 36)
+	root.BackgroundTransparency = 0.55
+	rootScale.Scale = 0.9
+	brand.TextTransparency = 1
+	tagline.TextTransparency = 1
+	outputLabel.TextTransparency = 1
+	if haloStroke then haloStroke.Transparency = 1 end
+
+	tween(root, THEME.spring, {
+		Size = UDim2.fromOffset(WIN_W, WIN_H),
+		BackgroundTransparency = 0,
+		Position = p,
+	})
+	tween(rootScale, THEME.spring, { Scale = 1 })
+	tween(brand, THEME.soft, { TextTransparency = 0 })
+	tween(tagline, THEME.soft, { TextTransparency = 0 })
+	tween(outputLabel, THEME.soft, { TextTransparency = 0 })
+	if haloStroke then
+		tween(haloStroke, THEME.soft, { Transparency = 0.88 })
+	end
+	dragSmooth.curX = p.X.Offset
+	dragSmooth.curY = p.Y.Offset
+	dragSmooth.goalX = p.X.Offset
+	dragSmooth.goalY = p.Y.Offset
+end
 
 applyUiLang()
 setStatus("")
-print("[lingo] loaded · optimized · RightShift to toggle")
+print("[lingo] loaded · motion polish · RightShift to toggle")
 return gui
