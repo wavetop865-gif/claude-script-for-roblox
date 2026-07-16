@@ -13,36 +13,36 @@ local RunService       = game:GetService("RunService")
 local player    = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- цвета
+-- цвета / твина
 local THEME = {
-	bg         = Color3.fromRGB(11, 12, 16),
-	panel      = Color3.fromRGB(17, 18, 24),
-	elevated   = Color3.fromRGB(24, 26, 34),
-	field      = Color3.fromRGB(15, 16, 22),
-	fieldAlt   = Color3.fromRGB(20, 22, 30),
-	hover      = Color3.fromRGB(32, 34, 44),
-	line       = Color3.fromRGB(48, 50, 62),
-	lineSoft   = Color3.fromRGB(36, 38, 48),
+	bg = Color3.fromRGB(11, 12, 16),
+	panel = Color3.fromRGB(17, 18, 24),
+	elevated = Color3.fromRGB(24, 26, 34),
+	field = Color3.fromRGB(15, 16, 22),
+	fieldAlt = Color3.fromRGB(20, 22, 30),
+	hover = Color3.fromRGB(32, 34, 44),
+	line = Color3.fromRGB(48, 50, 62),
+	lineSoft = Color3.fromRGB(36, 38, 48),
 
-	accent     = Color3.fromRGB(255, 156, 102),
+	accent = Color3.fromRGB(255, 156, 102),
 	accentDeep = Color3.fromRGB(210, 110, 70),
 	accentSoft = Color3.fromRGB(255, 186, 140),
-	inkOnAccent= Color3.fromRGB(28, 16, 10),
+	inkOnAccent = Color3.fromRGB(28, 16, 10),
 
-	ok         = Color3.fromRGB(110, 200, 150),
-	danger     = Color3.fromRGB(235, 100, 110),
+	ok = Color3.fromRGB(110, 200, 150),
+	danger = Color3.fromRGB(235, 100, 110),
 
-	text       = Color3.fromRGB(240, 236, 230),
-	textDim    = Color3.fromRGB(160, 156, 150),
-	textMute   = Color3.fromRGB(105, 102, 98),
+	text = Color3.fromRGB(240, 236, 230),
+	textDim = Color3.fromRGB(160, 156, 150),
+	textMute = Color3.fromRGB(105, 102, 98),
 
-	font       = Enum.Font.GothamMedium,
-	fontBold   = Enum.Font.GothamBold,
-	fontBlack  = Enum.Font.GothamBlack,
-	fontLight  = Enum.Font.Gotham,
+	font = Enum.Font.GothamMedium,
+	fontBold = Enum.Font.GothamBold,
+	fontBlack = Enum.Font.GothamBlack,
+	fontLight = Enum.Font.Gotham,
 
 	fast = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-	med  = TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+	med = TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
 	slow = TweenInfo.new(0.42, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
 	spring = TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
 	soft = TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
@@ -52,7 +52,6 @@ local THEME = {
 local WIN_W, WIN_H = 580, 540
 local MIN_W, MIN_H = 420, 420
 local MAX_W, MAX_H = 1100, 900
-
 local winSize = { w = WIN_W, h = WIN_H }
 
 -- тексты интерфейса
@@ -150,21 +149,21 @@ local LANGS = {
 	{ code = "ro",    name = "Română" },
 }
 
-local LANG_MAP: {[string]: string} = {}
+local LANG_MAP = {}
 for _, L in ipairs(LANGS) do
 	LANG_MAP[L.code] = L.name
 end
 
-local function langName(code: string): string
+local function langName(code)
 	return LANG_MAP[code] or code
 end
 
 -- мелочи
-local function new(class: string, props: {[string]: any}?, kids: {Instance}?): any
+local function new(class, props, kids)
 	local inst = Instance.new(class)
 	if props then
 		for k, v in pairs(props) do
-			(inst :: any)[k] = v
+			(inst)[k] = v
 		end
 	end
 	if kids then
@@ -173,14 +172,14 @@ local function new(class: string, props: {[string]: any}?, kids: {Instance}?): a
 	return inst
 end
 
-local function corner(r: number, parent: Instance?): UICorner
+local function corner(r, parent)
 	local c = Instance.new("UICorner")
 	c.CornerRadius = UDim.new(0, r)
 	if parent then c.Parent = parent end
 	return c
 end
 
-local function stroke(color: Color3, thickness: number?, parent: Instance?, transparency: number?): UIStroke
+local function stroke(color, thickness, parent, transparency)
 	local s = Instance.new("UIStroke")
 	s.Color = color
 	s.Thickness = thickness or 1
@@ -190,7 +189,7 @@ local function stroke(color: Color3, thickness: number?, parent: Instance?, tran
 	return s
 end
 
-local function pad(t: number, r: number?, b: number?, l: number?, parent: Instance?): UIPadding
+local function pad(t, r, b, l, parent)
 	local p = Instance.new("UIPadding")
 	p.PaddingTop = UDim.new(0, t)
 	p.PaddingRight = UDim.new(0, r or t)
@@ -200,14 +199,14 @@ local function pad(t: number, r: number?, b: number?, l: number?, parent: Instan
 	return p
 end
 
-local function tween(obj: Instance, info: TweenInfo, props: {[string]: any}): Tween
+local function tween(obj, info, props)
 	local tw = TweenService:Create(obj, info, props)
 	tw:Play()
 	return tw
 end
 
 -- анимация кнопок при наведении/клике
-local function bindPressFeel(btn: GuiObject, opts: {hoverScale: number?, pressScale: number?, hoverColor: Color3?, baseColor: Color3?}?)
+local function bindPressFeel(btn, opts)
 	opts = opts or {}
 	local hoverScale = opts.hoverScale or 1.03
 	local pressScale = opts.pressScale or 0.96
@@ -264,11 +263,11 @@ local dragSmooth = {
 	friction = 8,
 }
 
-local function posFromSmooth(): UDim2
+local function posFromSmooth()
 	return UDim2.new(dragSmooth.scale, dragSmooth.curX, dragSmooth.scale, dragSmooth.curY)
 end
 
-local function makeDraggable(handle: GuiObject, target: GuiObject, onDragState: ((boolean) -> ())?)
+local function makeDraggable(handle, target, onDragState)
 	handle.Active = true
 	handle.InputBegan:Connect(function(input)
 		if input.UserInputType ~= Enum.UserInputType.MouseButton1
@@ -278,8 +277,8 @@ local function makeDraggable(handle: GuiObject, target: GuiObject, onDragState: 
 		local startMouse = input.Position
 		local startPos = target.Position
 		local moving = true
-		local moveConn: RBXScriptConnection
-		local endConn: RBXScriptConnection
+		local moveConn
+		local endConn
 
 		dragSmooth.active = true
 		dragSmooth.scale = startPos.X.Scale
@@ -355,11 +354,11 @@ local ARROW = {
 	tl = "◤", tr = "◥", bl = "◣", br = "◢",
 }
 
-local function makeResizeHandle(parent: Frame, target: Frame, edge: string, sizeState: {w: number, h: number})
+local function makeResizeHandle(parent, target, edge, sizeState)
 	local EDGE = 10
 	local CORNER = 16
 
-	local props: {[string]: any} = {
+	local props = {
 		Parent = parent,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
@@ -462,9 +461,8 @@ local function makeResizeHandle(parent: Frame, target: Frame, edge: string, size
 		local startSize = Vector2.new(target.AbsoluteSize.X, target.AbsoluteSize.Y)
 		local startPos = target.Position
 		local resizing = true
-		local moveConn: RBXScriptConnection
-		local endConn: RBXScriptConnection
-
+		local moveConn
+		local endConn
 		tween(chip, THEME.fast, { BackgroundTransparency = 0.15 })
 		tween(arrow, THEME.fast, { TextTransparency = 0 })
 
@@ -510,13 +508,13 @@ local function makeResizeHandle(parent: Frame, target: Frame, edge: string, size
 	return handle
 end
 
-local function textLen(s: string): number
+local function textLen(s)
 	local n = utf8 and utf8.len(s)
 	return n or #s
 end
 
 -- плазма на фоне (не каждый кадр, чтоб не лагало)
-local function makeAtmosphere(parent: Frame)
+local function makeAtmosphere(parent)
 	local layer = new("Frame", {
 		Name = "Plasma",
 		Parent = parent,
@@ -737,7 +735,7 @@ local function makeAtmosphere(parent: Frame)
 	end)
 
 	controller.connection = conn
-	function controller.setEnabled(on: boolean)
+	function controller.setEnabled(on)
 		controller.enabled = on
 	end
 	return controller
@@ -750,15 +748,15 @@ local httpFn = (syn and syn.request)
 	or request
 	or (fluxus and fluxus.request)
 
-local translateCache: {[string]: {text: string, detected: string?}} = {}
+local translateCache = {}
 local CACHE_MAX = 40
-local cacheOrder: {string} = {}
+local cacheOrder = {}
 
-local function cacheGet(key: string)
+local function cacheGet(key)
 	return translateCache[key]
 end
 
-local function cacheSet(key: string, text: string, detected: string?)
+local function cacheSet(key, text, detected)
 	if not translateCache[key] then
 		table.insert(cacheOrder, key)
 		if #cacheOrder > CACHE_MAX then
@@ -769,7 +767,7 @@ local function cacheSet(key: string, text: string, detected: string?)
 	translateCache[key] = { text = text, detected = detected }
 end
 
-local function httpRequest(opts: {[string]: any}): (boolean, string?)
+local function httpRequest(opts)
 	if httpFn then
 		local ok, res = pcall(httpFn, opts)
 		if ok and res then
@@ -790,14 +788,14 @@ local function httpRequest(opts: {[string]: any}): (boolean, string?)
 	return false, nil
 end
 
-local function urlEncode(s: string): string
+local function urlEncode(s)
 	s = s:gsub("\n", " ")
 	return (s:gsub("([^%w%-_%.%~])", function(c)
 		return string.format("%%%02X", string.byte(c))
 	end))
 end
 
-local function translateText(text: string, sl: string, tl: string): (boolean, string, string?)
+local function translateText(text, sl, tl)
 	local cacheKey = sl .. "|" .. tl .. "|" .. text
 	local hit = cacheGet(cacheKey)
 	if hit then
@@ -851,11 +849,11 @@ local state = {
 	fromCode = "auto",
 	toCode   = "en",
 	busy     = false,
-	history  = {} :: {{src: string, dst: string, from: string, to: string}},
+	history  = {},
 	visible  = true,
 }
 
-local function t(key: string): string
+local function t(key)
 	local pack = I18N[state.uiLang] or I18N.ru
 	return pack[key] or key
 end
@@ -936,7 +934,7 @@ root:GetPropertyChangedSignal("Size"):Connect(syncHalo)
 root:GetPropertyChangedSignal("Visible"):Connect(syncHalo)
 syncHalo()
 
-local atm: any = nil
+local atm = nil
 
 -- блик сверху
 local sheen = new("Frame", {
@@ -981,7 +979,7 @@ local grip = new("Frame", {
 })
 corner(99, grip)
 
-local function onWindowDrag(dragging: boolean)
+local function onWindowDrag(dragging)
 	if dragging then
 		tween(rootScale, THEME.fast, { Scale = 1.018 })
 		if haloStroke then
@@ -1076,7 +1074,7 @@ new("UIListLayout", {
 })
 pad(3, 3, 3, 3, seg)
 
-local uiChips: {[string]: TextButton} = {}
+local uiChips = {}
 local closeBtn = new("TextButton", {
 	Parent = header,
 	AnchorPoint = Vector2.new(1, 0.5),
@@ -1122,7 +1120,7 @@ local langRow = new("Frame", {
 	ZIndex = 4,
 })
 
-local function makeLangPicker(side: string)
+local function makeLangPicker(side)
 	local box = new("TextButton", {
 		Parent = langRow,
 		Size = UDim2.new(0.42, 0, 1, 0),
@@ -1301,7 +1299,7 @@ local function cancelTextReveal()
 	outRevealToken += 1
 end
 
-local function revealText(label: TextLabel, full: string, color: Color3)
+local function revealText(label, full, color)
 	cancelTextReveal()
 	local token = outRevealToken
 	label.TextColor3 = color
@@ -1347,7 +1345,7 @@ local function revealText(label: TextLabel, full: string, color: Color3)
 end
 
 local translatePulse = false
-local function setTranslatePulse(on: boolean)
+local function setTranslatePulse(on)
 	translatePulse = on
 	if on then
 		task.spawn(function()
@@ -1527,7 +1525,7 @@ new("UIListLayout", {
 	SortOrder = Enum.SortOrder.LayoutOrder,
 })
 
-local dropTarget: string? = nil
+local dropTarget = nil
 
 local function closeDropdown()
 	dropdown.Visible = false
@@ -1535,7 +1533,7 @@ local function closeDropdown()
 	dropTarget = nil
 end
 
-local function openDropdown(which: string, anchor: GuiObject)
+local function openDropdown(which, anchor)
 	dropTarget = which
 	for _, ch in ipairs(dropdown:GetChildren()) do
 		if ch:IsA("TextButton") then ch:Destroy() end
@@ -1713,12 +1711,12 @@ for i, code in ipairs(UI_LANGS) do
 end
 
 -- клики / хоткеи
-local function setStatus(msg: string, color: Color3?)
+local function setStatus(msg, color)
 	statusLbl.Text = msg
 	statusLbl.TextColor3 = color or THEME.textMute
 end
 
-local function pulseOutput(okFlag: boolean)
+local function pulseOutput(okFlag)
 	outStroke.Color = okFlag and THEME.accent or THEME.danger
 	outStroke.Transparency = 0
 	tween(outStroke, THEME.med, { Color = THEME.lineSoft, Transparency = 0.1 })
@@ -1879,7 +1877,7 @@ end)
 
 local animatingVis = false
 
-local function setVisible(v: boolean)
+local function setVisible(v)
 	if animatingVis then return end
 	if v == state.visible and root.Visible == v then return end
 
