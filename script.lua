@@ -152,11 +152,13 @@ local LANGS = {
 	{ code = "ro",    name = "Română" },
 }
 
+local LANG_MAP: {[string]: string} = {}
+for _, L in ipairs(LANGS) do
+	LANG_MAP[L.code] = L.name
+end
+
 local function langName(code: string): string
-	for _, L in ipairs(LANGS) do
-		if L.code == code then return L.name end
-	end
-	return code
+	return LANG_MAP[code] or code
 end
 
 -- ============================================================
@@ -209,35 +211,37 @@ local function tween(obj: Instance, info: TweenInfo, props: {[string]: any}): Tw
 end
 
 local function makeDraggable(handle: GuiObject, target: GuiObject)
-	local dragging = false
-	local startMouse: Vector3
-	local startPos: UDim2
 	handle.Active = true
-
 	handle.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1
-			or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = true
-			startMouse = input.Position
-			startPos = target.Position
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1
+			and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
 		end
-	end)
-	UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1
-			or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = false
-		end
-	end)
-	UserInputService.InputChanged:Connect(function(input)
-		if not dragging then return end
-		if input.UserInputType == Enum.UserInputType.MouseMovement
-			or input.UserInputType == Enum.UserInputType.Touch then
-			local d = input.Position - startMouse
+		local startMouse = input.Position
+		local startPos = target.Position
+		local moving = true
+		local moveConn: RBXScriptConnection
+		local endConn: RBXScriptConnection
+		moveConn = UserInputService.InputChanged:Connect(function(changed)
+			if not moving then return end
+			if changed.UserInputType ~= Enum.UserInputType.MouseMovement
+				and changed.UserInputType ~= Enum.UserInputType.Touch then
+				return
+			end
+			local d = changed.Position - startMouse
 			target.Position = UDim2.new(
 				startPos.X.Scale, startPos.X.Offset + d.X,
 				startPos.Y.Scale, startPos.Y.Offset + d.Y
 			)
-		end
+		end)
+		endConn = UserInputService.InputEnded:Connect(function(ended)
+			if ended.UserInputType == Enum.UserInputType.MouseButton1
+				or ended.UserInputType == Enum.UserInputType.Touch then
+				moving = false
+				moveConn:Disconnect()
+				endConn:Disconnect()
+			end
+		end)
 	end)
 end
 
@@ -258,7 +262,6 @@ local function makeResizeHandle(parent: Frame, target: Frame, edge: string, size
 	if edge == "l" then
 		props.Size = UDim2.new(0, EDGE, 1, -CORNER * 2)
 		props.Position = UDim2.new(0, 0, 0, CORNER)
-		props.AnchorPoint = Vector2.new(0, 0)
 	elseif edge == "r" then
 		props.Size = UDim2.new(0, EDGE, 1, -CORNER * 2)
 		props.Position = UDim2.new(1, 0, 0, CORNER)
@@ -266,7 +269,6 @@ local function makeResizeHandle(parent: Frame, target: Frame, edge: string, size
 	elseif edge == "t" then
 		props.Size = UDim2.new(1, -CORNER * 2, 0, EDGE)
 		props.Position = UDim2.new(0, CORNER, 0, 0)
-		props.AnchorPoint = Vector2.new(0, 0)
 	elseif edge == "b" then
 		props.Size = UDim2.new(1, -CORNER * 2, 0, EDGE)
 		props.Position = UDim2.new(0, CORNER, 1, 0)
@@ -290,9 +292,7 @@ local function makeResizeHandle(parent: Frame, target: Frame, edge: string, size
 
 	local handle = new("Frame", props)
 
-	-- Visible corner grip on bottom-right
 	if edge == "br" then
-		handle.BackgroundTransparency = 1
 		local g1 = new("Frame", {
 			Parent = handle,
 			AnchorPoint = Vector2.new(1, 1),
@@ -317,84 +317,58 @@ local function makeResizeHandle(parent: Frame, target: Frame, edge: string, size
 		corner(2, g2)
 	end
 
-	local resizing = false
-	local startMouse: Vector3
-	local startSize: Vector2
-	local startPos: UDim2
-	-- For top-left anchored windows we'd adjust differently.
-	-- Root uses AnchorPoint 0.5,0.5 — compensate position so the opposite edge stays put.
+	local hasL = edge == "l" or edge == "tl" or edge == "bl"
+	local hasR = edge == "r" or edge == "tr" or edge == "br"
+	local hasT = edge == "t" or edge == "tl" or edge == "tr"
+	local hasB = edge == "b" or edge == "bl" or edge == "br"
 
 	handle.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1
-			or input.UserInputType == Enum.UserInputType.Touch then
-			resizing = true
-			startMouse = input.Position
-			startSize = Vector2.new(target.AbsoluteSize.X, target.AbsoluteSize.Y)
-			startPos = target.Position
-		end
-	end)
-
-	UserInputService.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1
-			or input.UserInputType == Enum.UserInputType.Touch then
-			resizing = false
-		end
-	end)
-
-	UserInputService.InputChanged:Connect(function(input)
-		if not resizing then return end
-		if input.UserInputType ~= Enum.UserInputType.MouseMovement
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1
 			and input.UserInputType ~= Enum.UserInputType.Touch then
 			return
 		end
+		local startMouse = input.Position
+		local startSize = Vector2.new(target.AbsoluteSize.X, target.AbsoluteSize.Y)
+		local startPos = target.Position
+		local resizing = true
+		local moveConn: RBXScriptConnection
+		local endConn: RBXScriptConnection
 
-		local d = input.Position - startMouse
-		local dw, dh = 0, 0
+		moveConn = UserInputService.InputChanged:Connect(function(changed)
+			if not resizing then return end
+			if changed.UserInputType ~= Enum.UserInputType.MouseMovement
+				and changed.UserInputType ~= Enum.UserInputType.Touch then
+				return
+			end
 
-		local hasL = edge == "l" or edge == "tl" or edge == "bl"
-		local hasR = edge == "r" or edge == "tr" or edge == "br"
-		local hasT = edge == "t" or edge == "tl" or edge == "tr"
-		local hasB = edge == "b" or edge == "bl" or edge == "br"
+			local d = changed.Position - startMouse
+			local dw = hasR and d.X or (hasL and -d.X or 0)
+			local dh = hasB and d.Y or (hasT and -d.Y or 0)
+			local nw = math.clamp(startSize.X + dw, MIN_W, MAX_W)
+			local nh = math.clamp(startSize.Y + dh, MIN_H, MAX_H)
+			local appliedDw = nw - startSize.X
+			local appliedDh = nh - startSize.Y
 
-		if hasR then
-			dw = d.X
-		elseif hasL then
-			dw = -d.X
-		end
+			local ox = hasL and (-appliedDw / 2) or (hasR and (appliedDw / 2) or 0)
+			local oy = hasT and (-appliedDh / 2) or (hasB and (appliedDh / 2) or 0)
 
-		if hasB then
-			dh = d.Y
-		elseif hasT then
-			dh = -d.Y
-		end
+			sizeState.w = nw
+			sizeState.h = nh
+			target.Size = UDim2.fromOffset(nw, nh)
+			target.Position = UDim2.new(
+				startPos.X.Scale, startPos.X.Offset + ox,
+				startPos.Y.Scale, startPos.Y.Offset + oy
+			)
+		end)
 
-		local nw = math.clamp(startSize.X + dw, MIN_W, MAX_W)
-		local nh = math.clamp(startSize.Y + dh, MIN_H, MAX_H)
-
-		local appliedDw = nw - startSize.X
-		local appliedDh = nh - startSize.Y
-
-		-- Keep the opposite edge fixed (root AnchorPoint is 0.5, 0.5)
-		local ox = 0
-		local oy = 0
-		if hasL then
-			ox = -appliedDw / 2
-		elseif hasR then
-			ox = appliedDw / 2
-		end
-		if hasT then
-			oy = -appliedDh / 2
-		elseif hasB then
-			oy = appliedDh / 2
-		end
-
-		sizeState.w = nw
-		sizeState.h = nh
-		target.Size = UDim2.fromOffset(nw, nh)
-		target.Position = UDim2.new(
-			startPos.X.Scale, startPos.X.Offset + ox,
-			startPos.Y.Scale, startPos.Y.Offset + oy
-		)
+		endConn = UserInputService.InputEnded:Connect(function(ended)
+			if ended.UserInputType == Enum.UserInputType.MouseButton1
+				or ended.UserInputType == Enum.UserInputType.Touch then
+				resizing = false
+				moveConn:Disconnect()
+				endConn:Disconnect()
+			end
+		end)
 	end)
 
 	return handle
@@ -405,7 +379,7 @@ local function textLen(s: string): number
 	return n or #s
 end
 
--- Plasma background (flowing ribbons + low-res plasma field — no circles)
+-- Plasma background — same look, throttled + pausable
 local function makeAtmosphere(parent: Frame)
 	local layer = new("Frame", {
 		Name = "Plasma",
@@ -417,7 +391,6 @@ local function makeAtmosphere(parent: Frame)
 	})
 	corner(24, layer)
 
-	-- Base wash
 	local wash = new("Frame", {
 		Parent = layer,
 		Size = UDim2.fromScale(1, 1),
@@ -436,7 +409,6 @@ local function makeAtmosphere(parent: Frame)
 		Rotation = 35,
 	})
 
-	-- Soft plasma ribbons (elongated bands, not orbs)
 	local ribbons = {}
 	local ribbonDefs = {
 		{ y = 0.08, h = 0.22, rot = -8,  c1 = THEME.accentDeep, c2 = Color3.fromRGB(80, 40, 90), t = 0.82 },
@@ -470,7 +442,7 @@ local function makeAtmosphere(parent: Frame)
 				NumberSequenceKeypoint.new(1, 0.55),
 			}),
 		})
-		table.insert(ribbons, {
+		ribbons[i] = {
 			band = band,
 			grad = g,
 			baseY = d.y,
@@ -478,10 +450,9 @@ local function makeAtmosphere(parent: Frame)
 			baseT = d.t,
 			phase = i * 1.7,
 			speed = 0.35 + i * 0.08,
-		})
+		}
 	end
 
-	-- Low-res plasma grid (soft squares)
 	local COLS, ROWS = 10, 8
 	local grid = new("Frame", {
 		Parent = layer,
@@ -489,9 +460,11 @@ local function makeAtmosphere(parent: Frame)
 		BackgroundTransparency = 1,
 		ZIndex = 0,
 	})
-	local cells = {}
+	local cells = table.create(COLS * ROWS)
+	local n = 0
 	for row = 0, ROWS - 1 do
 		for col = 0, COLS - 1 do
+			n += 1
 			local cell = new("Frame", {
 				Parent = grid,
 				Size = UDim2.new(1 / COLS, 1, 1 / ROWS, 1),
@@ -502,15 +475,15 @@ local function makeAtmosphere(parent: Frame)
 				ZIndex = 0,
 			})
 			corner(4, cell)
-			table.insert(cells, {
+			cells[n] = {
 				obj = cell,
 				nx = col / (COLS - 1),
 				ny = row / (ROWS - 1),
-			})
+				lastIdx = -1,
+			}
 		end
 	end
 
-	local t0 = os.clock()
 	local pal = {
 		Color3.fromRGB(28, 18, 40),
 		Color3.fromRGB(70, 35, 55),
@@ -519,22 +492,36 @@ local function makeAtmosphere(parent: Frame)
 		Color3.fromRGB(90, 110, 180),
 		Color3.fromRGB(40, 55, 100),
 	}
-
-	local function plasmaColor(v: number): Color3
-		-- v in 0..1 → palette lerp
-		local scaled = math.clamp(v, 0, 0.999) * (#pal - 1)
-		local i = math.floor(scaled) + 1
+	-- Precomputed LUT so we don't Lerp 80 times per tick
+	local LUT_N = 48
+	local colorLut = table.create(LUT_N)
+	local transLut = table.create(LUT_N)
+	for i = 1, LUT_N do
+		local v = (i - 1) / (LUT_N - 1)
+		local scaled = v * (#pal - 1)
+		local pi = math.floor(scaled) + 1
 		local f = scaled - math.floor(scaled)
-		local a, b = pal[i], pal[math.min(i + 1, #pal)]
-		return a:Lerp(b, f)
+		colorLut[i] = pal[pi]:Lerp(pal[math.min(pi + 1, #pal)], f)
+		transLut[i] = 0.88 + (1 - v) * 0.08
 	end
 
-	return RunService.Heartbeat:Connect(function()
-		local t = (os.clock() - t0) * 0.85
+	local controller = { enabled = true }
+	local t0 = os.clock()
+	local acc = 0
+	local STEP = 1 / 14 -- ~14 FPS background is enough
 
+	local conn = RunService.Heartbeat:Connect(function(dt)
+		if not controller.enabled then return end
+		acc += dt
+		if acc < STEP then return end
+		if acc > STEP * 3 then acc = STEP end
+		acc -= STEP
+
+		local t = (os.clock() - t0) * 0.85
 		washGrad.Rotation = 35 + math.sin(t * 0.25) * 18
 
-		for _, r in ipairs(ribbons) do
+		for i = 1, #ribbons do
+			local r = ribbons[i]
 			local wave = math.sin(t * r.speed + r.phase)
 			r.band.Rotation = r.baseRot + wave * 10
 			r.band.Position = UDim2.new(0.5 + math.sin(t * 0.2 + r.phase) * 0.06, 0, r.baseY + wave * 0.03, 0)
@@ -542,31 +529,61 @@ local function makeAtmosphere(parent: Frame)
 			r.grad.Offset = Vector2.new(math.sin(t * 0.4 + r.phase) * 0.35, 0)
 		end
 
-		for _, c in ipairs(cells) do
+		for i = 1, n do
+			local c = cells[i]
 			local x, y = c.nx, c.ny
 			local v = math.sin(x * 6.2 + t)
 				+ math.sin(y * 5.1 + t * 1.25)
 				+ math.sin((x + y) * 4.4 + t * 0.8)
 				+ math.sin(math.sqrt(x * x + y * y) * 7.0 + t * 1.1)
-			v = (v + 4) / 8 -- 0..1
-			c.obj.BackgroundColor3 = plasmaColor(v)
-			c.obj.BackgroundTransparency = 0.88 + (1 - v) * 0.08
+			local idx = math.floor(((v + 4) / 8) * (LUT_N - 1) + 0.5) + 1
+			if idx < 1 then idx = 1 elseif idx > LUT_N then idx = LUT_N end
+			if idx ~= c.lastIdx then
+				c.lastIdx = idx
+				c.obj.BackgroundColor3 = colorLut[idx]
+				c.obj.BackgroundTransparency = transLut[idx]
+			end
 		end
 	end)
+
+	controller.connection = conn
+	function controller.setEnabled(on: boolean)
+		controller.enabled = on
+	end
+	return controller
 end
 
 -- ============================================================
--- HTTP translate
+-- HTTP translate (cached request fn + result cache)
 -- ============================================================
-local function httpRequest(opts: {[string]: any}): (boolean, string?)
-	local fn = (syn and syn.request)
-		or (http and http.request)
-		or http_request
-		or request
-		or (fluxus and fluxus.request)
+local httpFn = (syn and syn.request)
+	or (http and http.request)
+	or http_request
+	or request
+	or (fluxus and fluxus.request)
 
-	if fn then
-		local ok, res = pcall(fn, opts)
+local translateCache: {[string]: {text: string, detected: string?}} = {}
+local CACHE_MAX = 40
+local cacheOrder: {string} = {}
+
+local function cacheGet(key: string)
+	return translateCache[key]
+end
+
+local function cacheSet(key: string, text: string, detected: string?)
+	if not translateCache[key] then
+		table.insert(cacheOrder, key)
+		if #cacheOrder > CACHE_MAX then
+			local old = table.remove(cacheOrder, 1)
+			if old then translateCache[old] = nil end
+		end
+	end
+	translateCache[key] = { text = text, detected = detected }
+end
+
+local function httpRequest(opts: {[string]: any}): (boolean, string?)
+	if httpFn then
+		local ok, res = pcall(httpFn, opts)
 		if ok and res then
 			local body = res.Body or res.body or ""
 			local code = res.StatusCode or res.status_code or 0
@@ -593,6 +610,12 @@ local function urlEncode(s: string): string
 end
 
 local function translateText(text: string, sl: string, tl: string): (boolean, string, string?)
+	local cacheKey = sl .. "|" .. tl .. "|" .. text
+	local hit = cacheGet(cacheKey)
+	if hit then
+		return true, hit.text, hit.detected
+	end
+
 	local url = string.format(
 		"https://translate.googleapis.com/translate_a/single?client=gtx&sl=%s&tl=%s&dt=t&q=%s",
 		urlEncode(sl), urlEncode(tl), urlEncode(text)
@@ -619,17 +642,19 @@ local function translateText(text: string, sl: string, tl: string): (boolean, st
 		return false, "", "parse"
 	end
 
-	local out = {}
-	for _, part in ipairs(chunks) do
+	local out = table.create(#chunks)
+	for i, part in ipairs(chunks) do
 		if type(part) == "table" and type(part[1]) == "string" then
-			table.insert(out, part[1])
+			out[#out + 1] = part[1]
 		end
 	end
-	local result = table.concat(out, "")
+	local result = table.concat(out)
 	if result == "" then
 		return false, "", "parse"
 	end
-	return true, result, typeof(detected) == "string" and detected or nil
+	local det = typeof(detected) == "string" and detected or nil
+	cacheSet(cacheKey, result, det)
+	return true, result, det
 end
 
 -- ============================================================
@@ -699,13 +724,18 @@ for _, edge in ipairs({ "l", "r", "t", "b", "tl", "tr", "bl", "br" }) do
 	makeResizeHandle(root, root, edge, winSize)
 end
 
-RunService.RenderStepped:Connect(function()
+local function syncHalo()
 	halo.Position = root.Position
 	halo.Size = UDim2.fromOffset(root.AbsoluteSize.X + 18, root.AbsoluteSize.Y + 18)
 	halo.Visible = root.Visible
-end)
+end
+root:GetPropertyChangedSignal("Position"):Connect(syncHalo)
+root:GetPropertyChangedSignal("Size"):Connect(syncHalo)
+root:GetPropertyChangedSignal("Visible"):Connect(syncHalo)
+syncHalo()
 
-local _atm = makeAtmosphere(root)
+-- Atmosphere created after brandMark (see below)
+local atm: any = nil
 
 -- Inner glass sheen
 local sheen = new("Frame", {
@@ -769,6 +799,8 @@ new("UIGradient", {
 	}),
 	Rotation = 90,
 })
+
+atm = makeAtmosphere(root)
 
 local brand = new("TextLabel", {
 	Parent = header,
@@ -1530,6 +1562,7 @@ local function setVisible(v: boolean)
 	state.visible = v
 	root.Visible = v
 	halo.Visible = v
+	if atm then atm.setEnabled(v) end
 	if v then
 		local w, h = winSize.w, winSize.h
 		root.Size = UDim2.fromOffset(w - 40, h - 36)
@@ -1587,5 +1620,5 @@ tween(root, THEME.spring, {
 
 applyUiLang()
 setStatus("")
-print("[lingo] loaded · resize edges/corners · RightShift to toggle")
+print("[lingo] loaded · optimized · RightShift to toggle")
 return gui
