@@ -1117,6 +1117,7 @@ local function makeLangPicker(side: string)
 	box.MouseLeave:Connect(function()
 		tween(box, THEME.fast, { BackgroundColor3 = THEME.elevated })
 	end)
+	bindPressFeel(box, { hoverScale = 1.015, pressScale = 0.985 })
 
 	return { Box = box, Caption = cap, Value = val, Chevron = chev }
 end
@@ -1747,8 +1748,10 @@ local function setVisible(v: boolean)
 	if atm then atm.setEnabled(v) end
 	if v then
 		local w, h = winSize.w, winSize.h
+		rootScale.Scale = 0.94
 		root.Size = UDim2.fromOffset(w - 40, h - 36)
 		root.BackgroundTransparency = 0.2
+		tween(rootScale, THEME.spring, { Scale = 1 })
 		tween(root, THEME.spring, {
 			Size = UDim2.fromOffset(w, h),
 			BackgroundTransparency = 0,
