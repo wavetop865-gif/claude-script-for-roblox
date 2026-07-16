@@ -210,7 +210,51 @@ local function tween(obj: Instance, info: TweenInfo, props: {[string]: any}): Tw
 	return tw
 end
 
-local function makeDraggable(handle: GuiObject, target: GuiObject)
+-- Soft press / hover scale for buttons
+local function bindPressFeel(btn: GuiObject, opts: {hoverScale: number?, pressScale: number?, hoverColor: Color3?, baseColor: Color3?}?)
+	opts = opts or {}
+	local hoverScale = opts.hoverScale or 1.03
+	local pressScale = opts.pressScale or 0.96
+	local baseColor = opts.baseColor
+	local hoverColor = opts.hoverColor
+	local hovering = false
+
+	local scale = btn:FindFirstChildOfClass("UIScale")
+	if not scale then
+		scale = Instance.new("UIScale")
+		scale.Scale = 1
+		scale.Parent = btn
+	end
+
+	btn.MouseEnter:Connect(function()
+		hovering = true
+		tween(scale, THEME.fast, { Scale = hoverScale })
+		if hoverColor then
+			tween(btn, THEME.fast, { BackgroundColor3 = hoverColor })
+		end
+	end)
+	btn.MouseLeave:Connect(function()
+		hovering = false
+		tween(scale, THEME.med, { Scale = 1 })
+		if baseColor then
+			tween(btn, THEME.fast, { BackgroundColor3 = baseColor })
+		end
+	end)
+	btn.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			tween(scale, THEME.fast, { Scale = pressScale })
+		end
+	end)
+	btn.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			tween(scale, THEME.med, { Scale = hovering and hoverScale or 1 })
+		end
+	end)
+end
+
+local function makeDraggable(handle: GuiObject, target: GuiObject, onDragState: ((boolean) -> ())?)
 	handle.Active = true
 	handle.InputBegan:Connect(function(input)
 		if input.UserInputType ~= Enum.UserInputType.MouseButton1
@@ -222,6 +266,7 @@ local function makeDraggable(handle: GuiObject, target: GuiObject)
 		local moving = true
 		local moveConn: RBXScriptConnection
 		local endConn: RBXScriptConnection
+		if onDragState then onDragState(true) end
 		moveConn = UserInputService.InputChanged:Connect(function(changed)
 			if not moving then return end
 			if changed.UserInputType ~= Enum.UserInputType.MouseMovement
@@ -240,15 +285,21 @@ local function makeDraggable(handle: GuiObject, target: GuiObject)
 				moving = false
 				moveConn:Disconnect()
 				endConn:Disconnect()
+				if onDragState then onDragState(false) end
 			end
 		end)
 	end)
 end
 
--- edges: "l","r","t","b","tl","tr","bl","br"
+-- Visible arrow glyphs per edge
+local ARROW = {
+	l = "◀", r = "▶", t = "▲", b = "▼",
+	tl = "◤", tr = "◥", bl = "◣", br = "◢",
+}
+
 local function makeResizeHandle(parent: Frame, target: Frame, edge: string, sizeState: {w: number, h: number})
-	local EDGE = 8
-	local CORNER = 14
+	local EDGE = 10
+	local CORNER = 16
 
 	local props: {[string]: any} = {
 		Parent = parent,
@@ -292,30 +343,52 @@ local function makeResizeHandle(parent: Frame, target: Frame, edge: string, size
 
 	local handle = new("Frame", props)
 
-	if edge == "br" then
-		local g1 = new("Frame", {
-			Parent = handle,
-			AnchorPoint = Vector2.new(1, 1),
-			Position = UDim2.new(1, -5, 1, -5),
-			Size = UDim2.fromOffset(10, 2),
-			BackgroundColor3 = THEME.accent,
-			BackgroundTransparency = 0.35,
-			BorderSizePixel = 0,
-			ZIndex = 51,
-		})
-		corner(2, g1)
-		local g2 = new("Frame", {
-			Parent = handle,
-			AnchorPoint = Vector2.new(1, 1),
-			Position = UDim2.new(1, -5, 1, -5),
-			Size = UDim2.fromOffset(2, 10),
-			BackgroundColor3 = THEME.accent,
-			BackgroundTransparency = 0.35,
-			BorderSizePixel = 0,
-			ZIndex = 51,
-		})
-		corner(2, g2)
+	local chip = new("Frame", {
+		Parent = handle,
+		BackgroundColor3 = THEME.accent,
+		BackgroundTransparency = 0.78,
+		BorderSizePixel = 0,
+		ZIndex = 51,
+	})
+	corner(4, chip)
+
+	local isSide = edge == "l" or edge == "r" or edge == "t" or edge == "b"
+	local arrow = new("TextLabel", {
+		Parent = handle,
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Font = THEME.fontBold,
+		TextSize = isSide and 14 or 16,
+		TextColor3 = THEME.accent,
+		TextTransparency = 0.35,
+		Text = ARROW[edge] or "•",
+		ZIndex = 52,
+	})
+
+	if edge == "l" or edge == "r" then
+		chip.AnchorPoint = Vector2.new(0.5, 0.5)
+		chip.Position = UDim2.fromScale(0.5, 0.5)
+		chip.Size = UDim2.new(0, 3, 0, 36)
+	elseif edge == "t" or edge == "b" then
+		chip.AnchorPoint = Vector2.new(0.5, 0.5)
+		chip.Position = UDim2.fromScale(0.5, 0.5)
+		chip.Size = UDim2.new(0, 36, 0, 3)
+	else
+		chip.Size = UDim2.fromScale(1, 1)
+		chip.BackgroundTransparency = 0.85
 	end
+
+	local baseChipT = (edge == "l" or edge == "r" or edge == "t" or edge == "b") and 0.78 or 0.85
+	local baseArrowSize = isSide and 14 or 16
+
+	handle.MouseEnter:Connect(function()
+		tween(chip, THEME.fast, { BackgroundTransparency = 0.35 })
+		tween(arrow, THEME.fast, { TextTransparency = 0, TextSize = baseArrowSize + 2 })
+	end)
+	handle.MouseLeave:Connect(function()
+		tween(chip, THEME.med, { BackgroundTransparency = baseChipT })
+		tween(arrow, THEME.med, { TextTransparency = 0.35, TextSize = baseArrowSize })
+	end)
 
 	local hasL = edge == "l" or edge == "tl" or edge == "bl"
 	local hasR = edge == "r" or edge == "tr" or edge == "br"
@@ -333,6 +406,9 @@ local function makeResizeHandle(parent: Frame, target: Frame, edge: string, size
 		local resizing = true
 		local moveConn: RBXScriptConnection
 		local endConn: RBXScriptConnection
+
+		tween(chip, THEME.fast, { BackgroundTransparency = 0.15 })
+		tween(arrow, THEME.fast, { TextTransparency = 0 })
 
 		moveConn = UserInputService.InputChanged:Connect(function(changed)
 			if not resizing then return end
@@ -367,6 +443,8 @@ local function makeResizeHandle(parent: Frame, target: Frame, edge: string, size
 				resizing = false
 				moveConn:Disconnect()
 				endConn:Disconnect()
+				tween(chip, THEME.med, { BackgroundTransparency = baseChipT })
+				tween(arrow, THEME.med, { TextTransparency = 0.35 })
 			end
 		end)
 	end)
@@ -484,6 +562,43 @@ local function makeAtmosphere(parent: Frame)
 		end
 	end
 
+	-- Soft dust / snow motes (over plasma, light & cheap)
+	local FLAKE_N = 28
+	local snowLayer = new("Frame", {
+		Name = "Snow",
+		Parent = layer,
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
+		ZIndex = 1,
+	})
+	corner(24, snowLayer)
+	local flakes = table.create(FLAKE_N)
+	for i = 1, FLAKE_N do
+		local sz = (math.random() < 0.55) and 2 or (math.random() < 0.8 and 3 or 4)
+		local warm = math.random() < 0.35
+		local flake = new("Frame", {
+			Parent = snowLayer,
+			Size = UDim2.fromOffset(sz, sz),
+			BackgroundColor3 = warm and Color3.fromRGB(255, 210, 180) or Color3.fromRGB(245, 245, 250),
+			BackgroundTransparency = 0.35 + math.random() * 0.45,
+			BorderSizePixel = 0,
+			ZIndex = 1,
+			Position = UDim2.fromScale(math.random(), math.random()),
+		})
+		corner(99, flake)
+		flakes[i] = {
+			obj = flake,
+			x = math.random(),
+			y = math.random(),
+			vy = 0.04 + math.random() * 0.08,
+			vx = (math.random() - 0.5) * 0.04,
+			phase = math.random() * 6.28,
+			baseT = flake.BackgroundTransparency,
+			sz = sz,
+		}
+	end
+
 	local pal = {
 		Color3.fromRGB(28, 18, 40),
 		Color3.fromRGB(70, 35, 55),
@@ -508,10 +623,27 @@ local function makeAtmosphere(parent: Frame)
 	local controller = { enabled = true }
 	local t0 = os.clock()
 	local acc = 0
-	local STEP = 1 / 14 -- ~14 FPS background is enough
+	local STEP = 1 / 14 -- ~14 FPS plasma is enough
 
 	local conn = RunService.Heartbeat:Connect(function(dt)
 		if not controller.enabled then return end
+
+		-- Snow / dust every frame (few particles)
+		for i = 1, FLAKE_N do
+			local f = flakes[i]
+			f.phase += dt * (1.2 + f.sz * 0.2)
+			f.y += f.vy * dt
+			f.x += (f.vx + math.sin(f.phase) * 0.03) * dt
+			if f.y > 1.05 then
+				f.y = -0.05
+				f.x = math.random()
+			end
+			if f.x < -0.05 then f.x = 1.05 end
+			if f.x > 1.05 then f.x = -0.05 end
+			f.obj.Position = UDim2.fromScale(f.x, f.y)
+			f.obj.BackgroundTransparency = math.clamp(f.baseT + math.sin(f.phase) * 0.12, 0.2, 0.92)
+		end
+
 		acc += dt
 		if acc < STEP then return end
 		if acc > STEP * 3 then acc = STEP end
@@ -719,6 +851,12 @@ local root = new("Frame", {
 corner(24, root)
 stroke(THEME.line, 1, root, 0.25)
 
+local rootScale = Instance.new("UIScale")
+rootScale.Scale = 1
+rootScale.Parent = root
+
+local haloStroke = halo:FindFirstChildOfClass("UIStroke")
+
 -- Resize edges + corners (sides, top, bottom)
 for _, edge in ipairs({ "l", "r", "t", "b", "tl", "tr", "bl", "br" }) do
 	makeResizeHandle(root, root, edge, winSize)
@@ -767,7 +905,6 @@ local header = new("Frame", {
 	Active = true,
 	ZIndex = 3,
 })
-makeDraggable(header, root)
 
 local grip = new("Frame", {
 	Parent = header,
@@ -780,7 +917,33 @@ local grip = new("Frame", {
 	ZIndex = 5,
 })
 corner(99, grip)
-makeDraggable(grip, root)
+
+local function onWindowDrag(dragging: boolean)
+	if dragging then
+		tween(rootScale, THEME.fast, { Scale = 1.018 })
+		if haloStroke then
+			tween(haloStroke, THEME.fast, { Transparency = 0.5, Thickness = 3.4 })
+		end
+		tween(grip, THEME.fast, {
+			BackgroundColor3 = THEME.accent,
+			BackgroundTransparency = 0.15,
+			Size = UDim2.fromOffset(54, 5),
+		})
+	else
+		tween(rootScale, THEME.spring, { Scale = 1 })
+		if haloStroke then
+			tween(haloStroke, THEME.med, { Transparency = 0.88, Thickness = 2.5 })
+		end
+		tween(grip, THEME.med, {
+			BackgroundColor3 = THEME.textMute,
+			BackgroundTransparency = 0.4,
+			Size = UDim2.fromOffset(42, 4),
+		})
+	end
+end
+
+makeDraggable(header, root, onWindowDrag)
+makeDraggable(grip, root, onWindowDrag)
 
 local brandMark = new("Frame", {
 	Parent = header,
@@ -1476,12 +1639,12 @@ local function doTranslate()
 end
 
 translateBtn.MouseButton1Click:Connect(doTranslate)
-translateBtn.MouseEnter:Connect(function()
-	tween(translateBtn, THEME.fast, { BackgroundColor3 = THEME.accentSoft })
-end)
-translateBtn.MouseLeave:Connect(function()
-	tween(translateBtn, THEME.fast, { BackgroundColor3 = THEME.accent })
-end)
+bindPressFeel(translateBtn, {
+	hoverScale = 1.025,
+	pressScale = 0.97,
+	baseColor = THEME.accent,
+	hoverColor = THEME.accentSoft,
+})
 
 swapBtn.MouseButton1Click:Connect(function()
 	if state.fromCode == "auto" then
@@ -1500,16 +1663,21 @@ swapBtn.MouseButton1Click:Connect(function()
 			outputLabel.Text = tmp
 		end
 	end
+	local s = swapBtn:FindFirstChildOfClass("UIScale") or Instance.new("UIScale", swapBtn)
+	s.Scale = 0.9
+	tween(s, THEME.spring, { Scale = 1 })
 	tween(swapBtn, THEME.fast, { Rotation = 180 })
-	task.delay(0.18, function() swapBtn.Rotation = 0 end)
+	task.delay(0.22, function()
+		swapBtn.Rotation = 0
+	end)
 	charCount.Text = tostring(textLen(inputBox.Text)) .. " " .. t("chars")
 end)
-swapBtn.MouseEnter:Connect(function()
-	tween(swapBtn, THEME.fast, { BackgroundColor3 = THEME.hover })
-end)
-swapBtn.MouseLeave:Connect(function()
-	tween(swapBtn, THEME.fast, { BackgroundColor3 = THEME.field })
-end)
+bindPressFeel(swapBtn, {
+	hoverScale = 1.08,
+	pressScale = 0.92,
+	baseColor = THEME.field,
+	hoverColor = THEME.hover,
+})
 
 copyBtn.MouseButton1Click:Connect(function()
 	local txt = outputLabel.Text
@@ -1531,6 +1699,10 @@ copyBtn.MouseButton1Click:Connect(function()
 		setStatus("Clipboard n/a", THEME.danger)
 	end
 end)
+bindPressFeel(copyBtn, {
+	baseColor = THEME.elevated,
+	hoverColor = THEME.hover,
+})
 
 clearBtn.MouseButton1Click:Connect(function()
 	inputBox.Text = ""
@@ -1539,6 +1711,10 @@ clearBtn.MouseButton1Click:Connect(function()
 	charCount.Text = "0 " .. t("chars")
 	setStatus("")
 end)
+bindPressFeel(clearBtn, {
+	baseColor = THEME.elevated,
+	hoverColor = THEME.hover,
+})
 
 inputBox:GetPropertyChangedSignal("Text"):Connect(function()
 	charCount.Text = tostring(textLen(inputBox.Text)) .. " " .. t("chars")
@@ -1551,11 +1727,17 @@ inputBox.FocusLost:Connect(function()
 	tween(inStroke, THEME.fast, { Color = THEME.lineSoft, Transparency = 0.1 })
 end)
 
+bindPressFeel(closeBtn, {
+	hoverScale = 1.08,
+	pressScale = 0.9,
+	baseColor = THEME.elevated,
+	hoverColor = THEME.danger,
+})
 closeBtn.MouseEnter:Connect(function()
-	tween(closeBtn, THEME.fast, { BackgroundColor3 = THEME.danger, TextColor3 = THEME.text })
+	tween(closeBtn, THEME.fast, { TextColor3 = THEME.text })
 end)
 closeBtn.MouseLeave:Connect(function()
-	tween(closeBtn, THEME.fast, { BackgroundColor3 = THEME.elevated, TextColor3 = THEME.textDim })
+	tween(closeBtn, THEME.fast, { TextColor3 = THEME.textDim })
 end)
 
 local function setVisible(v: boolean)
