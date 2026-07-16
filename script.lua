@@ -163,11 +163,13 @@ local function new(class, props, kids)
 	local inst = Instance.new(class)
 	if props then
 		for k, v in pairs(props) do
-			(inst)[k] = v
+			inst[k] = v
 		end
 	end
 	if kids then
-		for _, c in ipairs(kids) do c.Parent = inst end
+		for _, c in ipairs(kids) do
+			c.Parent = inst
+		end
 	end
 	return inst
 end
