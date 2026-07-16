@@ -1,7 +1,7 @@
 --[[
-	Lingo — переводчик для Roblox-экзекютора
-	Дизайн: Ink & Apricot — глубокий ink-фон, тёплый акцент, мягкое стекло.
-	RU / EN / UA · drag за шапку · RightShift — показать/скрыть
+	lingo — переводчик для экзекютора
+	языки ui: ru / en / ua
+	RightShift — скрыть/показать, тащи за шапку
 ]]
 
 local Players          = game:GetService("Players")
@@ -13,9 +13,7 @@ local RunService       = game:GetService("RunService")
 local player    = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- ============================================================
--- Theme — Ink & Apricot
--- ============================================================
+-- цвета
 local THEME = {
 	bg         = Color3.fromRGB(11, 12, 16),
 	panel      = Color3.fromRGB(17, 18, 24),
@@ -57,9 +55,7 @@ local MAX_W, MAX_H = 1100, 900
 
 local winSize = { w = WIN_W, h = WIN_H }
 
--- ============================================================
--- i18n
--- ============================================================
+-- тексты интерфейса
 local UI_LANGS = { "ru", "en", "ua" }
 
 local I18N = {
@@ -163,9 +159,7 @@ local function langName(code: string): string
 	return LANG_MAP[code] or code
 end
 
--- ============================================================
--- Helpers
--- ============================================================
+-- мелочи
 local function new(class: string, props: {[string]: any}?, kids: {Instance}?): any
 	local inst = Instance.new(class)
 	if props then
@@ -212,7 +206,7 @@ local function tween(obj: Instance, info: TweenInfo, props: {[string]: any}): Tw
 	return tw
 end
 
--- Soft press / hover scale for buttons
+-- анимация кнопок при наведении/клике
 local function bindPressFeel(btn: GuiObject, opts: {hoverScale: number?, pressScale: number?, hoverColor: Color3?, baseColor: Color3?}?)
 	opts = opts or {}
 	local hoverScale = opts.hoverScale or 1.03
@@ -256,7 +250,7 @@ local function bindPressFeel(btn: GuiObject, opts: {hoverScale: number?, pressSc
 	end)
 end
 
--- Smooth drag across the screen (lerp follow + inertia)
+-- плавное перетаскивание + инерция
 local dragSmooth = {
 	active = false,
 	goalX = 0,
@@ -265,8 +259,7 @@ local dragSmooth = {
 	curY = 0,
 	velX = 0,
 	velY = 0,
-	scale = 0.5, -- Position scale component preserved
-	-- tuned feel
+	scale = 0.5,
 	follow = 18,
 	friction = 8,
 }
@@ -309,7 +302,6 @@ local function makeDraggable(handle: GuiObject, target: GuiObject, onDragState: 
 			local d = changed.Position - startMouse
 			dragSmooth.goalX = startPos.X.Offset + d.X
 			dragSmooth.goalY = startPos.Y.Offset + d.Y
-			-- approximate velocity from mouse delta
 			local md = changed.Position - lastMouse
 			dragSmooth.velX = md.X * 60
 			dragSmooth.velY = md.Y * 60
@@ -320,7 +312,7 @@ local function makeDraggable(handle: GuiObject, target: GuiObject, onDragState: 
 			if ended.UserInputType == Enum.UserInputType.MouseButton1
 				or ended.UserInputType == Enum.UserInputType.Touch then
 				moving = false
-				dragSmooth.active = false -- inertia takes over via vel
+				dragSmooth.active = false
 				moveConn:Disconnect()
 				endConn:Disconnect()
 				if onDragState then onDragState(false) end
@@ -329,7 +321,7 @@ local function makeDraggable(handle: GuiObject, target: GuiObject, onDragState: 
 	end)
 end
 
--- Drive smooth position every frame
+-- двигаем окно каждый кадр
 RunService.RenderStepped:Connect(function(dt)
 	dt = math.clamp(dt, 0, 0.05)
 	local ds = dragSmooth
@@ -340,7 +332,6 @@ RunService.RenderStepped:Connect(function(dt)
 		ds.velY = ds.velY + (ay - ds.velY) * math.clamp(dt * 20, 0, 1)
 		ds.curX += ds.velX * dt
 		ds.curY += ds.velY * dt
-		-- also pull directly for snappy-smooth hybrid
 		ds.curX += (ds.goalX - ds.curX) * math.clamp(dt * ds.follow, 0, 1)
 		ds.curY += (ds.goalY - ds.curY) * math.clamp(dt * ds.follow, 0, 1)
 	elseif math.abs(ds.velX) > 2 or math.abs(ds.velY) > 2 then
@@ -353,13 +344,12 @@ RunService.RenderStepped:Connect(function(dt)
 		return
 	end
 
-	-- apply to root if it exists later — set via callback
 	if dragSmooth.apply then
 		dragSmooth.apply(posFromSmooth())
 	end
 end)
 
--- Visible arrow glyphs per edge
+-- стрелки по краям
 local ARROW = {
 	l = "◀", r = "▶", t = "▲", b = "▼",
 	tl = "◤", tr = "◥", bl = "◣", br = "◢",
@@ -525,7 +515,7 @@ local function textLen(s: string): number
 	return n or #s
 end
 
--- Plasma background — same look, throttled + pausable
+-- плазма на фоне (не каждый кадр, чтоб не лагало)
 local function makeAtmosphere(parent: Frame)
 	local layer = new("Frame", {
 		Name = "Plasma",
@@ -630,7 +620,7 @@ local function makeAtmosphere(parent: Frame)
 		end
 	end
 
-	-- Soft dust / snow motes (over plasma, light & cheap)
+	-- снежинки / пыль поверх
 	local FLAKE_N = 28
 	local snowLayer = new("Frame", {
 		Name = "Snow",
@@ -675,7 +665,7 @@ local function makeAtmosphere(parent: Frame)
 		Color3.fromRGB(90, 110, 180),
 		Color3.fromRGB(40, 55, 100),
 	}
-	-- Precomputed LUT so we don't Lerp 80 times per tick
+	-- палитра цветов заранее, чтоб не считать каждый тик
 	local LUT_N = 48
 	local colorLut = table.create(LUT_N)
 	local transLut = table.create(LUT_N)
@@ -691,12 +681,12 @@ local function makeAtmosphere(parent: Frame)
 	local controller = { enabled = true }
 	local t0 = os.clock()
 	local acc = 0
-	local STEP = 1 / 14 -- ~14 FPS plasma is enough
+	local STEP = 1 / 14
 
 	local conn = RunService.Heartbeat:Connect(function(dt)
 		if not controller.enabled then return end
 
-		-- Snow / dust every frame (few particles)
+		-- снег каждый кадр, их мало
 		for i = 1, FLAKE_N do
 			local f = flakes[i]
 			f.phase += dt * (1.2 + f.sz * 0.2)
@@ -753,9 +743,7 @@ local function makeAtmosphere(parent: Frame)
 	return controller
 end
 
--- ============================================================
--- HTTP translate (cached request fn + result cache)
--- ============================================================
+-- перевод (с кэшем)
 local httpFn = (syn and syn.request)
 	or (http and http.request)
 	or http_request
@@ -857,9 +845,7 @@ local function translateText(text: string, sl: string, tl: string): (boolean, st
 	return true, result, det
 end
 
--- ============================================================
--- State
--- ============================================================
+-- состояние
 local state = {
 	uiLang   = "ru",
 	fromCode = "auto",
@@ -879,9 +865,7 @@ do
 	if prev then prev:Destroy() end
 end
 
--- ============================================================
--- Build UI
--- ============================================================
+-- ui
 local gui = new("ScreenGui", {
 	Name = "LingoTranslator",
 	Parent = playerGui,
@@ -891,7 +875,7 @@ local gui = new("ScreenGui", {
 	DisplayOrder = 100,
 })
 
--- Soft halo (no fullscreen dim)
+-- обводка вокруг окна
 local halo = new("Frame", {
 	Name = "Halo",
 	Parent = gui,
@@ -926,7 +910,6 @@ rootScale.Parent = root
 dragSmooth.apply = function(pos: UDim2)
 	root.Position = pos
 end
--- seed smooth state from current position
 do
 	local p = root.Position
 	dragSmooth.scale = p.X.Scale
@@ -938,7 +921,7 @@ end
 
 local haloStroke = halo:FindFirstChildOfClass("UIStroke")
 
--- Resize edges + corners (sides, top, bottom)
+-- ресайз по краям
 for _, edge in ipairs({ "l", "r", "t", "b", "tl", "tr", "bl", "br" }) do
 	makeResizeHandle(root, root, edge, winSize)
 end
@@ -953,10 +936,9 @@ root:GetPropertyChangedSignal("Size"):Connect(syncHalo)
 root:GetPropertyChangedSignal("Visible"):Connect(syncHalo)
 syncHalo()
 
--- Atmosphere created after brandMark (see below)
 local atm: any = nil
 
--- Inner glass sheen
+-- блик сверху
 local sheen = new("Frame", {
 	Parent = root,
 	Size = UDim2.new(1, 0, 0, 120),
@@ -978,7 +960,7 @@ new("UIGradient", {
 	Rotation = 90,
 })
 
--- ---------- Header ----------
+-- шапка
 local header = new("Frame", {
 	Parent = root,
 	Size = UDim2.new(1, 0, 0, 72),
@@ -1072,7 +1054,7 @@ local tagline = new("TextLabel", {
 	ZIndex = 4,
 })
 
--- Segmented UI lang switch
+-- переключатель языка ui
 local seg = new("Frame", {
 	Parent = header,
 	AnchorPoint = Vector2.new(1, 0.5),
@@ -1111,7 +1093,7 @@ local closeBtn = new("TextButton", {
 corner(10, closeBtn)
 stroke(THEME.lineSoft, 1, closeBtn, 0.25)
 
--- Divider under header
+-- линия под шапкой
 local divider = new("Frame", {
 	Parent = root,
 	Position = UDim2.fromOffset(22, 72),
@@ -1122,7 +1104,7 @@ local divider = new("Frame", {
 	ZIndex = 3,
 })
 
--- ---------- Body ----------
+-- контент
 local body = new("Frame", {
 	Parent = root,
 	Position = UDim2.fromOffset(0, 80),
@@ -1132,7 +1114,7 @@ local body = new("Frame", {
 })
 pad(8, 22, 18, 22, body)
 
--- Language row
+-- откуда / куда
 local langRow = new("Frame", {
 	Parent = body,
 	Size = UDim2.new(1, 0, 0, 56),
@@ -1222,7 +1204,7 @@ local swapBtn = new("TextButton", {
 corner(14, swapBtn)
 stroke(THEME.accent, 1.2, swapBtn, 0.55)
 
--- Flexible fields area (grows when window is resized)
+-- поля ввода/вывода (тянутся вместе с окном)
 local fields = new("Frame", {
 	Parent = body,
 	Position = UDim2.fromOffset(0, 68),
@@ -1333,7 +1315,7 @@ local function revealText(label: TextLabel, full: string, color: Color3)
 	})
 
 	task.spawn(function()
-		-- Fast typewriter (batched for long strings)
+		-- печатаем текст по кускам
 		local chars = {}
 		if utf8 and utf8.len(full) then
 			for _, code in utf8.codes(full) do
@@ -1387,7 +1369,7 @@ local function setTranslatePulse(on: boolean)
 	end
 end
 
--- Footer (actions + history) pinned to bottom
+-- низ: кнопки + история
 local footer = new("Frame", {
 	Parent = body,
 	AnchorPoint = Vector2.new(0, 1),
@@ -1397,7 +1379,7 @@ local footer = new("Frame", {
 	ZIndex = 4,
 })
 
--- Actions
+-- кнопки
 local actionRow = new("Frame", {
 	Parent = footer,
 	Size = UDim2.new(1, 0, 0, 46),
@@ -1513,7 +1495,7 @@ new("UIListLayout", {
 	SortOrder = Enum.SortOrder.LayoutOrder,
 })
 
--- Dropdown
+-- выпадающий список языков
 local dropOverlay = new("TextButton", {
 	Parent = root,
 	Size = UDim2.fromScale(1, 1),
@@ -1617,9 +1599,7 @@ toPicker.Box.MouseButton1Click:Connect(function()
 	openDropdown("to", toPicker.Box)
 end)
 
--- ============================================================
--- Refresh / history / chips
--- ============================================================
+-- история и язык ui
 local function refreshHistory()
 	for _, ch in ipairs(histScroll:GetChildren()) do
 		if not ch:IsA("UIListLayout") then
@@ -1732,9 +1712,7 @@ for i, code in ipairs(UI_LANGS) do
 	uiChips[code] = chip
 end
 
--- ============================================================
--- Interactions
--- ============================================================
+-- клики / хоткеи
 local function setStatus(msg: string, color: Color3?)
 	statusLbl.Text = msg
 	statusLbl.TextColor3 = color or THEME.textMute
@@ -1906,7 +1884,7 @@ local function setVisible(v: boolean)
 	if v == state.visible and root.Visible == v then return end
 
 	if v then
-		-- OPEN
+		-- открытие
 		animatingVis = true
 		state.visible = true
 		root.Visible = true
@@ -1920,7 +1898,6 @@ local function setVisible(v: boolean)
 		root.BackgroundTransparency = 0.55
 		if haloStroke then haloStroke.Transparency = 1 end
 
-		-- fade text in
 		outputLabel.TextTransparency = 1
 		brand.TextTransparency = 1
 		tagline.TextTransparency = 1
@@ -1938,7 +1915,6 @@ local function setVisible(v: boolean)
 		tween(tagline, THEME.soft, { TextTransparency = 0 })
 		tween(outputLabel, THEME.soft, { TextTransparency = 0 })
 
-		-- sync drag smooth to final pos
 		dragSmooth.curX = p.X.Offset
 		dragSmooth.curY = p.Y.Offset
 		dragSmooth.goalX = p.X.Offset
@@ -1950,7 +1926,7 @@ local function setVisible(v: boolean)
 			animatingVis = false
 		end)
 	else
-		-- CLOSE
+		-- закрытие
 		animatingVis = true
 		state.visible = false
 		local p = root.Position
@@ -1970,7 +1946,6 @@ local function setVisible(v: boolean)
 			root.Visible = false
 			halo.Visible = false
 			if atm then atm.setEnabled(false) end
-			-- restore position for next open
 			root.Position = p
 			root.BackgroundTransparency = 0
 			rootScale.Scale = 1
@@ -2004,7 +1979,7 @@ UserInputService.InputBegan:Connect(function(input, gpe)
 	end
 end)
 
--- Accent mark pulse
+-- мигание полоски у названия
 task.spawn(function()
 	while brandMark and brandMark.Parent do
 		tween(brandMark, TweenInfo.new(1.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
@@ -2018,7 +1993,7 @@ task.spawn(function()
 	end
 end)
 
--- Entrance (same language as open)
+-- появление при запуске
 do
 	local p = root.Position
 	root.Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset + 36)
@@ -2050,5 +2025,5 @@ end
 
 applyUiLang()
 setStatus("")
-print("[lingo] loaded · motion polish · RightShift to toggle")
+print("[lingo] загружен, RightShift — меню")
 return gui
