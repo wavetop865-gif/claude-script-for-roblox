@@ -1,6 +1,6 @@
 --[[
-	hardobby pad — тп только на HardObby.TouchPart
-	каждые 0.1 сек · без анимки · RightShift — меню
+	pad — тп на HardObby.TouchPart каждые 0.1с
+	ищет жёстко + firetouchinterest · RightShift — меню
 ]]
 
 local Players = game:GetService("Players")
@@ -30,6 +30,7 @@ local enabled = false
 local visible = true
 local lastTp = 0
 local cachedPart = nil
+local lastErr = ""
 
 local function new(class, props)
 	local i = Instance.new(class)
@@ -61,59 +62,149 @@ local function tween(obj, t, props)
 	return tw
 end
 
--- строго HardObby → TouchPart
-local function findTouchPart()
-	if cachedPart and cachedPart.Parent then
+local function findTouchPart(force)
+	if not force and cachedPart and cachedPart.Parent and cachedPart:IsA("BasePart") then
 		return cachedPart
 	end
 	cachedPart = nil
 
+	-- 1) workspace.HardObby.TouchPart
 	local hard = workspace:FindFirstChild("HardObby")
-	if not hard then
-		hard = workspace:FindFirstChild("HardObby", true)
-	end
-	if not hard then
-		return nil
-	end
-
-	local part = hard:FindFirstChild("TouchPart")
-	if part and part:IsA("BasePart") then
-		cachedPart = part
-		return part
+	if hard then
+		local tp = hard:FindFirstChild("TouchPart")
+		if tp and tp:IsA("BasePart") then
+			cachedPart = tp
+			return tp
+		end
 	end
 
-	part = hard:FindFirstChild("TouchPart", true)
-	if part and part:IsA("BasePart") then
-		cachedPart = part
-		return part
+	-- 2) любой HardObby глубже
+	hard = workspace:FindFirstChild("HardObby", true)
+	if hard then
+		local tp = hard:FindFirstChild("TouchPart") or hard:FindFirstChild("TouchPart", true)
+		if tp and tp:IsA("BasePart") then
+			cachedPart = tp
+			return tp
+		end
+	end
+
+	-- 3) полный обход: имя HardObby → внутри TouchPart
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj.Name == "HardObby" then
+			local tp = obj:FindFirstChild("TouchPart")
+			if not tp then
+				tp = obj:FindFirstChild("TouchPart", true)
+			end
+			if tp and tp:IsA("BasePart") then
+				cachedPart = tp
+				return tp
+			end
+		end
+	end
+
+	-- 4) запасной: любой TouchPart у которого рядом PadRegistry
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj:IsA("BasePart") and obj.Name == "TouchPart" then
+			if obj:FindFirstChild("PadRegistry") or obj:FindFirstChild("TouchInterest") then
+				local parent = obj.Parent
+				if parent and parent.Name == "HardObby" then
+					cachedPart = obj
+					return obj
+				end
+			end
+		end
 	end
 
 	return nil
 end
 
-local function getRoot()
-	local char = player.Character
+local function getChar()
+	return player.Character or player.CharacterAdded:Wait()
+end
+
+local function getRoot(char)
 	if not char then return nil end
 	return char:FindFirstChild("HumanoidRootPart")
 		or char:FindFirstChild("Torso")
+		or char:FindFirstChild("UpperTorso")
 		or char.PrimaryPart
 end
 
+local function fireTouch(root, part)
+	-- регистрируем касание пада (важно для чекпоинтов)
+	pcall(function()
+		if firetouchinterest then
+			firetouchinterest(root, part, 0)
+			task.wait()
+			firetouchinterest(root, part, 1)
+		end
+	end)
+	pcall(function()
+		if firetouchinterest then
+			firetouchinterest(part, root, 0)
+			task.wait()
+			firetouchinterest(part, root, 1)
+		end
+	end)
+end
+
+local function applyCFrame(char, root, cf)
+	-- несколько способов — что-то да пролезет
+	pcall(function()
+		char:PivotTo(cf)
+	end)
+	pcall(function()
+		root.CFrame = cf
+	end)
+	pcall(function()
+		if char.PrimaryPart then
+			char:SetPrimaryPartCFrame(cf)
+		end
+	end)
+	pcall(function()
+		root.AssemblyLinearVelocity = Vector3.zero
+		root.AssemblyAngularVelocity = Vector3.zero
+	end)
+	pcall(function()
+		root.Velocity = Vector3.zero
+		root.RotVelocity = Vector3.zero
+	end)
+end
+
 local function teleportHere()
-	local part = findTouchPart()
+	local part = findTouchPart(false)
+	if not part then
+		part = findTouchPart(true)
+	end
+	if not part then
+		lastErr = "нет HardObby.TouchPart"
+		return false, lastErr
+	end
+
 	local char = player.Character
-	local root = getRoot()
-	if not part then return false, "нет HardObby.TouchPart" end
-	if not char or not root then return false, "нет персонажа" end
+	if not char then
+		lastErr = "нет персонажа"
+		return false, lastErr
+	end
+	local root = getRoot(char)
+	if not root then
+		lastErr = "нет RootPart"
+		return false, lastErr
+	end
 
 	local hum = char:FindFirstChildOfClass("Humanoid")
 	local animate = char:FindFirstChild("Animate")
-	local cf = part.CFrame * CFrame.new(0, (part.Size.Y * 0.5) + 3, 0)
 
-	local ok = pcall(function()
+	-- встаём прямо на пад (чуть выше центра)
+	local offset = math.max(part.Size.Y * 0.5 + 2.5, 3)
+	local cf = part.CFrame * CFrame.new(0, offset, 0)
+
+	local ok, err = pcall(function()
 		if animate then animate.Disabled = true end
 		if hum then
 			pcall(function()
+				hum.Sit = false
+				hum.PlatformStand = false
 				hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
 				hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
 				hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
@@ -121,30 +212,23 @@ local function teleportHere()
 			end)
 		end
 
-		if char.PrimaryPart then
-			char:PivotTo(cf)
-		else
-			root.CFrame = cf
+		-- тп 3 раза подряд против античита / интерполяции
+		for _ = 1, 3 do
+			applyCFrame(char, root, cf)
 		end
 
-		root.AssemblyLinearVelocity = Vector3.zero
-		root.AssemblyAngularVelocity = Vector3.zero
-		pcall(function()
-			root.Velocity = Vector3.zero
-			root.RotVelocity = Vector3.zero
-		end)
+		fireTouch(root, part)
+
+		-- ещё раз после touch
+		applyCFrame(char, root, cf)
 
 		task.defer(function()
-			if not root or not root.Parent then return end
-			if char.PrimaryPart then
-				char:PivotTo(cf)
-			else
-				root.CFrame = cf
+			if root and root.Parent and part and part.Parent then
+				applyCFrame(char, root, cf)
+				fireTouch(root, part)
 			end
-			root.AssemblyLinearVelocity = Vector3.zero
-			root.AssemblyAngularVelocity = Vector3.zero
-			if animate then
-				task.delay(0.04, function()
+			if animate and animate.Parent then
+				task.delay(0.05, function()
 					if animate.Parent then animate.Disabled = false end
 				end)
 			end
@@ -158,7 +242,11 @@ local function teleportHere()
 		end)
 	end)
 
-	return ok, ok and "тп · TouchPart" or "ошибка"
+	if not ok then
+		lastErr = tostring(err)
+		return false, "ошибка тп"
+	end
+	return true, "тп · " .. part:GetFullName():gsub("^Workspace%.", "")
 end
 
 do
@@ -179,7 +267,7 @@ local frame = new("Frame", {
 	Parent = gui,
 	AnchorPoint = Vector2.new(0, 0.5),
 	Position = UDim2.new(0, 18, 0.55, 0),
-	Size = UDim2.fromOffset(228, 150),
+	Size = UDim2.fromOffset(250, 158),
 	BackgroundColor3 = C.bg,
 	BorderSizePixel = 0,
 	Active = true,
@@ -188,7 +276,7 @@ local frame = new("Frame", {
 corner(18, frame)
 stroke(C.accent, 1.5, frame, 0.7)
 
-new("Frame", {
+local sheen = new("Frame", {
 	Parent = frame,
 	Size = UDim2.new(1, 0, 0, 64),
 	BackgroundColor3 = Color3.new(1, 1, 1),
@@ -196,18 +284,14 @@ new("Frame", {
 	BorderSizePixel = 0,
 	ZIndex = 1,
 })
--- sheen
-do
-	local s = frame:FindFirstChildOfClass("Frame")
-	new("UIGradient", {
-		Parent = s,
-		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0.92),
-			NumberSequenceKeypoint.new(1, 1),
-		}),
-		Rotation = 90,
-	})
-end
+new("UIGradient", {
+	Parent = sheen,
+	Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.92),
+		NumberSequenceKeypoint.new(1, 1),
+	}),
+	Rotation = 90,
+})
 
 local mark = new("Frame", {
 	Parent = frame,
@@ -223,7 +307,7 @@ new("TextLabel", {
 	Parent = frame,
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(32, 12),
-	Size = UDim2.fromOffset(150, 26),
+	Size = UDim2.fromOffset(170, 26),
 	Font = Enum.Font.GothamBlack,
 	TextSize = 18,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -236,7 +320,7 @@ new("TextLabel", {
 	Parent = frame,
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(32, 34),
-	Size = UDim2.fromOffset(170, 16),
+	Size = UDim2.fromOffset(190, 16),
 	Font = Enum.Font.Gotham,
 	TextSize = 11,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -300,10 +384,12 @@ local status = new("TextLabel", {
 	Parent = frame,
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(16, 118),
-	Size = UDim2.new(1, -32, 0, 20),
+	Size = UDim2.new(1, -32, 0, 28),
 	Font = Enum.Font.Gotham,
 	TextSize = 11,
 	TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Top,
+	TextWrapped = true,
 	TextColor3 = C.mute,
 	Text = "ожидание…",
 	ZIndex = 2,
@@ -319,12 +405,12 @@ local function setEnabled(on)
 		toggleLbl.TextColor3 = C.ink
 		toggleStroke.Color = C.accentDim
 		tween(knob, 0.2, { Position = UDim2.new(1, -38, 0.5, 0), BackgroundColor3 = C.ink })
-		local p = findTouchPart()
+		local p = findTouchPart(true)
 		if p then
-			status.Text = "цель: TouchPart"
+			status.Text = "нашёл: " .. p:GetFullName():gsub("^Workspace%.", "")
 			status.TextColor3 = C.accent
 		else
-			status.Text = "нет HardObby.TouchPart"
+			status.Text = "нет HardObby.TouchPart в Workspace"
 			status.TextColor3 = C.danger
 		end
 	else
@@ -354,7 +440,6 @@ UserInputService.InputBegan:Connect(function(input)
 	end
 end)
 
--- drag
 frame.InputBegan:Connect(function(input)
 	if input.UserInputType ~= Enum.UserInputType.MouseButton1
 		and input.UserInputType ~= Enum.UserInputType.Touch then
@@ -384,22 +469,21 @@ frame.InputBegan:Connect(function(input)
 	end)
 end)
 
-RunService.Heartbeat:Connect(function()
+-- тп каждый кадр пока вкл (надёжнее чем только 0.1 таймер против античита)
+local acc = 0
+RunService.Heartbeat:Connect(function(dt)
 	if not enabled then return end
-	local now = os.clock()
-	if now - lastTp < INTERVAL then
-		status.Text = string.format("pad · %.2fs", INTERVAL - (now - lastTp))
-		status.TextColor3 = C.mute
-		return
-	end
-	lastTp = now
+	acc += dt
+	if acc < INTERVAL then return end
+	acc = 0
+
 	local ok, msg = teleportHere()
 	status.Text = tostring(msg)
 	status.TextColor3 = ok and C.ok or C.danger
 	if ok then
-		tween(mark, 0.08, { BackgroundTransparency = 0.45 })
-		task.delay(0.1, function()
-			tween(mark, 0.15, { BackgroundTransparency = 0 })
+		tween(mark, 0.06, { BackgroundTransparency = 0.45 })
+		task.delay(0.08, function()
+			tween(mark, 0.12, { BackgroundTransparency = 0 })
 		end)
 	end
 end)
@@ -407,6 +491,15 @@ end)
 frame.BackgroundTransparency = 0.45
 frame.Position = UDim2.new(0, -36, 0.55, 0)
 tween(frame, 0.35, { BackgroundTransparency = 0, Position = UDim2.new(0, 18, 0.55, 0) })
+
+task.defer(function()
+	local p = findTouchPart(true)
+	if p then
+		print("[pad] цель:", p:GetFullName())
+	else
+		print("[pad] HardObby.TouchPart не найден в Workspace")
+	end
+end)
 
 print("[pad] HardObby.TouchPart · RightShift")
 return gui
