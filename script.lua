@@ -13,41 +13,134 @@ local RunService       = game:GetService("RunService")
 local player    = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- цвета / твина
-local THEME = {
-	bg = Color3.fromRGB(11, 12, 16),
-	panel = Color3.fromRGB(17, 18, 24),
-	elevated = Color3.fromRGB(24, 26, 34),
-	field = Color3.fromRGB(15, 16, 22),
-	fieldAlt = Color3.fromRGB(20, 22, 30),
-	hover = Color3.fromRGB(32, 34, 44),
-	line = Color3.fromRGB(48, 50, 62),
-	lineSoft = Color3.fromRGB(36, 38, 48),
+-- цвета / твина (текущая тема лежит в THEME, паки ниже)
+local THEME = {}
 
-	accent = Color3.fromRGB(255, 156, 102),
-	accentDeep = Color3.fromRGB(210, 110, 70),
-	accentSoft = Color3.fromRGB(255, 186, 140),
-	inkOnAccent = Color3.fromRGB(28, 16, 10),
-
-	ok = Color3.fromRGB(110, 200, 150),
-	danger = Color3.fromRGB(235, 100, 110),
-
-	text = Color3.fromRGB(240, 236, 230),
-	textDim = Color3.fromRGB(160, 156, 150),
-	textMute = Color3.fromRGB(105, 102, 98),
-
-	font = Enum.Font.GothamMedium,
-	fontBold = Enum.Font.GothamBold,
-	fontBlack = Enum.Font.GothamBlack,
-	fontLight = Enum.Font.Gotham,
-
-	fast = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-	med = TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-	slow = TweenInfo.new(0.42, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-	spring = TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-	soft = TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-	close = TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.In),
+local THEME_PACKS = {
+	apricot = {
+		nameKey = "themeApricot",
+		bg = Color3.fromRGB(11, 12, 16),
+		panel = Color3.fromRGB(17, 18, 24),
+		elevated = Color3.fromRGB(24, 26, 34),
+		field = Color3.fromRGB(15, 16, 22),
+		fieldAlt = Color3.fromRGB(20, 22, 30),
+		hover = Color3.fromRGB(32, 34, 44),
+		line = Color3.fromRGB(48, 50, 62),
+		lineSoft = Color3.fromRGB(36, 38, 48),
+		accent = Color3.fromRGB(255, 156, 102),
+		accentDeep = Color3.fromRGB(210, 110, 70),
+		accentSoft = Color3.fromRGB(255, 186, 140),
+		inkOnAccent = Color3.fromRGB(28, 16, 10),
+		ok = Color3.fromRGB(110, 200, 150),
+		danger = Color3.fromRGB(235, 100, 110),
+		text = Color3.fromRGB(240, 236, 230),
+		textDim = Color3.fromRGB(160, 156, 150),
+		textMute = Color3.fromRGB(105, 102, 98),
+	},
+	mint = {
+		nameKey = "themeMint",
+		bg = Color3.fromRGB(10, 14, 14),
+		panel = Color3.fromRGB(14, 20, 20),
+		elevated = Color3.fromRGB(22, 32, 30),
+		field = Color3.fromRGB(12, 18, 17),
+		fieldAlt = Color3.fromRGB(18, 26, 24),
+		hover = Color3.fromRGB(28, 40, 38),
+		line = Color3.fromRGB(40, 58, 54),
+		lineSoft = Color3.fromRGB(32, 46, 44),
+		accent = Color3.fromRGB(72, 210, 180),
+		accentDeep = Color3.fromRGB(40, 150, 130),
+		accentSoft = Color3.fromRGB(130, 235, 210),
+		inkOnAccent = Color3.fromRGB(8, 22, 18),
+		ok = Color3.fromRGB(110, 210, 160),
+		danger = Color3.fromRGB(235, 100, 110),
+		text = Color3.fromRGB(230, 242, 238),
+		textDim = Color3.fromRGB(150, 170, 165),
+		textMute = Color3.fromRGB(95, 115, 110),
+	},
+	ocean = {
+		nameKey = "themeOcean",
+		bg = Color3.fromRGB(9, 12, 18),
+		panel = Color3.fromRGB(14, 18, 28),
+		elevated = Color3.fromRGB(22, 28, 42),
+		field = Color3.fromRGB(12, 16, 24),
+		fieldAlt = Color3.fromRGB(18, 24, 36),
+		hover = Color3.fromRGB(30, 38, 55),
+		line = Color3.fromRGB(42, 52, 72),
+		lineSoft = Color3.fromRGB(32, 40, 58),
+		accent = Color3.fromRGB(90, 160, 255),
+		accentDeep = Color3.fromRGB(50, 100, 200),
+		accentSoft = Color3.fromRGB(150, 195, 255),
+		inkOnAccent = Color3.fromRGB(8, 16, 32),
+		ok = Color3.fromRGB(100, 210, 170),
+		danger = Color3.fromRGB(235, 100, 110),
+		text = Color3.fromRGB(230, 236, 245),
+		textDim = Color3.fromRGB(150, 160, 180),
+		textMute = Color3.fromRGB(100, 110, 130),
+	},
+	rose = {
+		nameKey = "themeRose",
+		bg = Color3.fromRGB(14, 10, 12),
+		panel = Color3.fromRGB(22, 14, 18),
+		elevated = Color3.fromRGB(34, 22, 28),
+		field = Color3.fromRGB(18, 12, 15),
+		fieldAlt = Color3.fromRGB(26, 18, 22),
+		hover = Color3.fromRGB(42, 28, 34),
+		line = Color3.fromRGB(60, 40, 48),
+		lineSoft = Color3.fromRGB(46, 32, 38),
+		accent = Color3.fromRGB(255, 120, 150),
+		accentDeep = Color3.fromRGB(200, 70, 100),
+		accentSoft = Color3.fromRGB(255, 170, 190),
+		inkOnAccent = Color3.fromRGB(30, 10, 16),
+		ok = Color3.fromRGB(120, 200, 150),
+		danger = Color3.fromRGB(240, 90, 100),
+		text = Color3.fromRGB(245, 230, 235),
+		textDim = Color3.fromRGB(175, 150, 160),
+		textMute = Color3.fromRGB(120, 100, 110),
+	},
 }
+
+local THEME_ORDER = { "apricot", "mint", "ocean", "rose" }
+
+-- как окно ездит по экрану
+local MOTION_STYLES = {
+	smooth = { nameKey = "motionSmooth", follow = 18, friction = 8, dragScale = 1.018, inertia = true },
+	snappy = { nameKey = "motionSnappy", follow = 42, friction = 14, dragScale = 1.01, inertia = true },
+	heavy = { nameKey = "motionHeavy", follow = 8, friction = 4, dragScale = 1.03, inertia = true },
+	float = { nameKey = "motionFloat", follow = 12, friction = 3, dragScale = 1.025, inertia = true },
+	instant = { nameKey = "motionInstant", follow = 80, friction = 30, dragScale = 1.0, inertia = false },
+}
+local MOTION_ORDER = { "smooth", "snappy", "heavy", "float", "instant" }
+
+-- анимация открытия/закрытия
+local ANIM_STYLES = {
+	spring = { nameKey = "animSpring" },
+	slide = { nameKey = "animSlide" },
+	fade = { nameKey = "animFade" },
+	pop = { nameKey = "animPop" },
+	none = { nameKey = "animNone" },
+}
+local ANIM_ORDER = { "spring", "slide", "fade", "pop", "none" }
+
+local function copyTheme(id)
+	local pack = THEME_PACKS[id] or THEME_PACKS.apricot
+	for k, v in pairs(pack) do
+		if k ~= "nameKey" then
+			THEME[k] = v
+		end
+	end
+	THEME.font = Enum.Font.GothamMedium
+	THEME.fontBold = Enum.Font.GothamBold
+	THEME.fontBlack = Enum.Font.GothamBlack
+	THEME.fontLight = Enum.Font.Gotham
+	THEME.fast = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	THEME.med = TweenInfo.new(0.24, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	THEME.slow = TweenInfo.new(0.42, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	THEME.spring = TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	THEME.soft = TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	THEME.close = TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+end
+
+copyTheme("apricot")
 
 local WIN_W, WIN_H = 580, 540
 local MIN_W, MIN_H = 420, 420
@@ -79,6 +172,28 @@ local I18N = {
 		done        = "Готово",
 		chars       = "симв.",
 		hint        = "тяни края · шапку · RightShift",
+		settings    = "Настройки",
+		theme       = "Тема",
+		motion      = "Перемещение",
+		anim        = "Анимация",
+		themeApricot = "Абрикос",
+		themeMint    = "Мята",
+		themeOcean   = "Океан",
+		themeRose    = "Роза",
+		motionSmooth = "Плавно",
+		motionSnappy = "Резко",
+		motionHeavy  = "Тяжело",
+		motionFloat  = "Парит",
+		motionInstant= "Мгновенно",
+		animSpring = "Пружина",
+		animSlide  = "Слайд",
+		animFade   = "Фейд",
+		animPop    = "Поп",
+		animNone   = "Без аним.",
+		back       = "Назад",
+		snow       = "Снег / пыль",
+		on         = "Вкл",
+		off        = "Выкл",
 	},
 	en = {
 		tagline     = "translator",
@@ -101,6 +216,28 @@ local I18N = {
 		done        = "Done",
 		chars       = "chars",
 		hint        = "drag edges · header · RightShift",
+		settings    = "Settings",
+		theme       = "Theme",
+		motion      = "Movement",
+		anim        = "Animation",
+		themeApricot = "Apricot",
+		themeMint    = "Mint",
+		themeOcean   = "Ocean",
+		themeRose    = "Rose",
+		motionSmooth = "Smooth",
+		motionSnappy = "Snappy",
+		motionHeavy  = "Heavy",
+		motionFloat  = "Float",
+		motionInstant= "Instant",
+		animSpring = "Spring",
+		animSlide  = "Slide",
+		animFade   = "Fade",
+		animPop    = "Pop",
+		animNone   = "None",
+		back       = "Back",
+		snow       = "Snow / dust",
+		on         = "On",
+		off        = "Off",
 	},
 	ua = {
 		tagline     = "перекладач",
@@ -123,6 +260,28 @@ local I18N = {
 		done        = "Готово",
 		chars       = "симв.",
 		hint        = "тягни краї · шапку · RightShift",
+		settings    = "Налаштування",
+		theme       = "Тема",
+		motion      = "Переміщення",
+		anim        = "Анімація",
+		themeApricot = "Абрикос",
+		themeMint    = "М’ята",
+		themeOcean   = "Океан",
+		themeRose    = "Троянда",
+		motionSmooth = "Плавно",
+		motionSnappy = "Різко",
+		motionHeavy  = "Важко",
+		motionFloat  = "Парить",
+		motionInstant= "Миттєво",
+		animSpring = "Пружина",
+		animSlide  = "Слайд",
+		animFade   = "Фейд",
+		animPop    = "Поп",
+		animNone   = "Без анім.",
+		back       = "Назад",
+		snow       = "Сніг / пил",
+		on         = "Увімк",
+		off        = "Вимк",
 	},
 }
 
@@ -207,13 +366,9 @@ local function tween(obj, info, props)
 	return tw
 end
 
--- анимация кнопок при наведении/клике
+-- анимация кнопок при наведении/клике (opts можно обновлять при смене темы)
 local function bindPressFeel(btn, opts)
 	opts = opts or {}
-	local hoverScale = opts.hoverScale or 1.03
-	local pressScale = opts.pressScale or 0.96
-	local baseColor = opts.baseColor
-	local hoverColor = opts.hoverColor
 	local hovering = false
 
 	local scale = btn:FindFirstChildOfClass("UIScale")
@@ -225,30 +380,33 @@ local function bindPressFeel(btn, opts)
 
 	btn.MouseEnter:Connect(function()
 		hovering = true
+		local hoverScale = opts.hoverScale or 1.03
 		tween(scale, THEME.fast, { Scale = hoverScale })
-		if hoverColor then
-			tween(btn, THEME.fast, { BackgroundColor3 = hoverColor })
+		if opts.hoverColor then
+			tween(btn, THEME.fast, { BackgroundColor3 = opts.hoverColor })
 		end
 	end)
 	btn.MouseLeave:Connect(function()
 		hovering = false
 		tween(scale, THEME.med, { Scale = 1 })
-		if baseColor then
-			tween(btn, THEME.fast, { BackgroundColor3 = baseColor })
+		if opts.baseColor then
+			tween(btn, THEME.fast, { BackgroundColor3 = opts.baseColor })
 		end
 	end)
 	btn.InputBegan:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch then
-			tween(scale, THEME.fast, { Scale = pressScale })
+			tween(scale, THEME.fast, { Scale = opts.pressScale or 0.96 })
 		end
 	end)
 	btn.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch then
+			local hoverScale = opts.hoverScale or 1.03
 			tween(scale, THEME.med, { Scale = hovering and hoverScale or 1 })
 		end
 	end)
+	return opts
 end
 
 -- плавное перетаскивание + инерция
@@ -326,16 +484,27 @@ end
 RunService.RenderStepped:Connect(function(dt)
 	dt = math.clamp(dt, 0, 0.05)
 	local ds = dragSmooth
+	local style = MOTION_STYLES[state.motionId] or MOTION_STYLES.smooth
+	ds.follow = style.follow
+	ds.friction = style.friction
+
 	if ds.active then
-		local ax = (ds.goalX - ds.curX) * ds.follow
-		local ay = (ds.goalY - ds.curY) * ds.follow
-		ds.velX = ds.velX + (ax - ds.velX) * math.clamp(dt * 20, 0, 1)
-		ds.velY = ds.velY + (ay - ds.velY) * math.clamp(dt * 20, 0, 1)
-		ds.curX += ds.velX * dt
-		ds.curY += ds.velY * dt
-		ds.curX += (ds.goalX - ds.curX) * math.clamp(dt * ds.follow, 0, 1)
-		ds.curY += (ds.goalY - ds.curY) * math.clamp(dt * ds.follow, 0, 1)
-	elseif math.abs(ds.velX) > 2 or math.abs(ds.velY) > 2 then
+		if not style.inertia then
+			ds.curX = ds.goalX
+			ds.curY = ds.goalY
+			ds.velX = 0
+			ds.velY = 0
+		else
+			local ax = (ds.goalX - ds.curX) * ds.follow
+			local ay = (ds.goalY - ds.curY) * ds.follow
+			ds.velX = ds.velX + (ax - ds.velX) * math.clamp(dt * 20, 0, 1)
+			ds.velY = ds.velY + (ay - ds.velY) * math.clamp(dt * 20, 0, 1)
+			ds.curX += ds.velX * dt
+			ds.curY += ds.velY * dt
+			ds.curX += (ds.goalX - ds.curX) * math.clamp(dt * ds.follow, 0, 1)
+			ds.curY += (ds.goalY - ds.curY) * math.clamp(dt * ds.follow, 0, 1)
+		end
+	elseif style.inertia and (math.abs(ds.velX) > 2 or math.abs(ds.velY) > 2) then
 		ds.curX += ds.velX * dt
 		ds.curY += ds.velY * dt
 		local damp = math.exp(-ds.friction * dt)
@@ -687,19 +856,21 @@ local function makeAtmosphere(parent)
 		if not controller.enabled then return end
 
 		-- снег каждый кадр, их мало
-		for i = 1, FLAKE_N do
-			local f = flakes[i]
-			f.phase += dt * (1.2 + f.sz * 0.2)
-			f.y += f.vy * dt
-			f.x += (f.vx + math.sin(f.phase) * 0.03) * dt
-			if f.y > 1.05 then
-				f.y = -0.05
-				f.x = math.random()
+		if state.snow then
+			for i = 1, FLAKE_N do
+				local f = flakes[i]
+				f.phase += dt * (1.2 + f.sz * 0.2)
+				f.y += f.vy * dt
+				f.x += (f.vx + math.sin(f.phase) * 0.03) * dt
+				if f.y > 1.05 then
+					f.y = -0.05
+					f.x = math.random()
+				end
+				if f.x < -0.05 then f.x = 1.05 end
+				if f.x > 1.05 then f.x = -0.05 end
+				f.obj.Position = UDim2.fromScale(f.x, f.y)
+				f.obj.BackgroundTransparency = math.clamp(f.baseT + math.sin(f.phase) * 0.12, 0.2, 0.92)
 			end
-			if f.x < -0.05 then f.x = 1.05 end
-			if f.x > 1.05 then f.x = -0.05 end
-			f.obj.Position = UDim2.fromScale(f.x, f.y)
-			f.obj.BackgroundTransparency = math.clamp(f.baseT + math.sin(f.phase) * 0.12, 0.2, 0.92)
 		end
 
 		acc += dt
@@ -740,6 +911,10 @@ local function makeAtmosphere(parent)
 	function controller.setEnabled(on)
 		controller.enabled = on
 	end
+	function controller.setSnow(on)
+		snowLayer.Visible = on and true or false
+	end
+	snowLayer.Visible = state.snow
 	return controller
 end
 
@@ -847,13 +1022,21 @@ end
 
 -- состояние
 local state = {
-	uiLang   = "ru",
+	uiLang = "ru",
 	fromCode = "auto",
-	toCode   = "en",
-	busy     = false,
-	history  = {},
-	visible  = true,
+	toCode = "en",
+	busy = false,
+	history = {},
+	visible = true,
+	themeId = "apricot",
+	motionId = "smooth",
+	animId = "spring",
+	snow = true,
+	settingsOpen = false,
 }
+
+local applyTheme, applyMotion, refreshSettingsLabels, openSettings, applyUiLang
+local feelOpts = {}
 
 local function t(key)
 	local pack = I18N[state.uiLang] or I18N.ru
@@ -901,13 +1084,13 @@ local root = new("Frame", {
 	ZIndex = 1,
 })
 corner(24, root)
-stroke(THEME.line, 1, root, 0.25)
+local rootStroke = stroke(THEME.line, 1, root, 0.25)
 
 local rootScale = Instance.new("UIScale")
 rootScale.Scale = 1
 rootScale.Parent = root
 
-dragSmooth.apply = function(pos: UDim2)
+dragSmooth.apply = function(pos)
 	root.Position = pos
 end
 do
@@ -982,8 +1165,10 @@ local grip = new("Frame", {
 corner(99, grip)
 
 local function onWindowDrag(dragging)
+	local style = MOTION_STYLES[state.motionId] or MOTION_STYLES.smooth
+	local sc = style.dragScale or 1.018
 	if dragging then
-		tween(rootScale, THEME.fast, { Scale = 1.018 })
+		tween(rootScale, THEME.fast, { Scale = sc })
 		if haloStroke then
 			tween(haloStroke, THEME.fast, { Transparency = 0.5, Thickness = 3.4 })
 		end
@@ -1054,11 +1239,11 @@ local tagline = new("TextLabel", {
 	ZIndex = 4,
 })
 
--- переключатель языка ui
+-- переключатель языка ui (слева от ⚙ и ✕)
 local seg = new("Frame", {
 	Parent = header,
 	AnchorPoint = Vector2.new(1, 0.5),
-	Position = UDim2.new(1, -56, 0.5, 6),
+	Position = UDim2.new(1, -96, 0.5, 6),
 	Size = UDim2.fromOffset(118, 32),
 	BackgroundColor3 = THEME.elevated,
 	BorderSizePixel = 0,
@@ -1077,6 +1262,23 @@ new("UIListLayout", {
 pad(3, 3, 3, 3, seg)
 
 local uiChips = {}
+
+local settingsBtn = new("TextButton", {
+	Parent = header,
+	AnchorPoint = Vector2.new(1, 0.5),
+	Position = UDim2.new(1, -54, 0.5, 6),
+	Size = UDim2.fromOffset(32, 32),
+	BackgroundColor3 = THEME.elevated,
+	Text = "⚙",
+	Font = THEME.fontBold,
+	TextSize = 14,
+	TextColor3 = THEME.textDim,
+	AutoButtonColor = false,
+	ZIndex = 5,
+})
+corner(10, settingsBtn)
+stroke(THEME.lineSoft, 1, settingsBtn, 0.25)
+
 local closeBtn = new("TextButton", {
 	Parent = header,
 	AnchorPoint = Vector2.new(1, 0.5),
@@ -1495,6 +1697,213 @@ new("UIListLayout", {
 	SortOrder = Enum.SortOrder.LayoutOrder,
 })
 
+-- настройки
+local settingsPanel = new("ScrollingFrame", {
+	Parent = root,
+	Position = UDim2.fromOffset(0, 72),
+	Size = UDim2.new(1, 0, 1, -72),
+	BackgroundColor3 = THEME.bg,
+	BackgroundTransparency = 0.08,
+	Visible = false,
+	ZIndex = 25,
+	ClipsDescendants = true,
+	BorderSizePixel = 0,
+	ScrollBarThickness = 3,
+	ScrollBarImageColor3 = THEME.accent,
+	CanvasSize = UDim2.fromOffset(0, 430),
+	ScrollingDirection = Enum.ScrollingDirection.Y,
+})
+corner(24, settingsPanel)
+pad(16, 22, 18, 22, settingsPanel)
+
+local settingsTitle = new("TextLabel", {
+	Parent = settingsPanel,
+	BackgroundTransparency = 1,
+	Size = UDim2.new(1, -80, 0, 28),
+	Font = THEME.fontBlack,
+	TextSize = 20,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextColor3 = THEME.text,
+	Text = t("settings"),
+	ZIndex = 26,
+})
+
+local backBtn = new("TextButton", {
+	Parent = settingsPanel,
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, 0, 0, 0),
+	Size = UDim2.fromOffset(72, 28),
+	BackgroundColor3 = THEME.elevated,
+	Text = t("back"),
+	Font = THEME.fontBold,
+	TextSize = 12,
+	TextColor3 = THEME.text,
+	AutoButtonColor = false,
+	ZIndex = 26,
+})
+corner(8, backBtn)
+stroke(THEME.lineSoft, 1, backBtn, 0.2)
+
+local function makeSettingsSection(titleKey, y)
+	local lbl = new("TextLabel", {
+		Parent = settingsPanel,
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, y),
+		Size = UDim2.new(1, 0, 0, 18),
+		Font = THEME.fontBold,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = THEME.textDim,
+		Text = t(titleKey),
+		ZIndex = 26,
+	})
+	local row = new("Frame", {
+		Parent = settingsPanel,
+		Position = UDim2.fromOffset(0, y + 22),
+		Size = UDim2.new(1, 0, 0, 76),
+		BackgroundTransparency = 1,
+		ZIndex = 26,
+	})
+	new("UIListLayout", {
+		Parent = row,
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Wraps = true,
+	})
+	return lbl, row
+end
+
+local themeLbl, themeRow = makeSettingsSection("theme", 44)
+local motionLbl, motionRow = makeSettingsSection("motion", 130)
+local animLbl, animRow = makeSettingsSection("anim", 216)
+
+local snowLbl = new("TextLabel", {
+	Parent = settingsPanel,
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 302),
+	Size = UDim2.new(0.5, 0, 0, 18),
+	Font = THEME.fontBold,
+	TextSize = 12,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextColor3 = THEME.textDim,
+	Text = t("snow"),
+	ZIndex = 26,
+})
+
+local snowBtn = new("TextButton", {
+	Parent = settingsPanel,
+	Position = UDim2.fromOffset(0, 324),
+	Size = UDim2.fromOffset(90, 32),
+	BackgroundColor3 = THEME.accent,
+	Text = t("on"),
+	Font = THEME.fontBold,
+	TextSize = 12,
+	TextColor3 = THEME.inkOnAccent,
+	AutoButtonColor = false,
+	ZIndex = 26,
+})
+corner(10, snowBtn)
+
+local settingsHint = new("TextLabel", {
+	Parent = settingsPanel,
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 370),
+	Size = UDim2.new(1, 0, 0, 40),
+	Font = THEME.fontLight,
+	TextSize = 12,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Top,
+	TextColor3 = THEME.textMute,
+	TextWrapped = true,
+	Text = "",
+	ZIndex = 26,
+})
+
+local themeChips = {}
+local motionChips = {}
+local animChips = {}
+
+local function styleChip(btn, active)
+	if active then
+		btn.BackgroundColor3 = THEME.accent
+		btn.TextColor3 = THEME.inkOnAccent
+	else
+		btn.BackgroundColor3 = THEME.elevated
+		btn.TextColor3 = THEME.textDim
+	end
+end
+
+refreshSettingsLabels = function()
+	settingsTitle.Text = t("settings")
+	backBtn.Text = t("back")
+	themeLbl.Text = t("theme")
+	motionLbl.Text = t("motion")
+	animLbl.Text = t("anim")
+	snowLbl.Text = t("snow")
+	snowBtn.Text = state.snow and t("on") or t("off")
+	styleChip(snowBtn, state.snow)
+	for id, btn in pairs(themeChips) do
+		btn.Text = "  " .. t(THEME_PACKS[id].nameKey) .. "  "
+		styleChip(btn, id == state.themeId)
+	end
+	for id, btn in pairs(motionChips) do
+		btn.Text = "  " .. t(MOTION_STYLES[id].nameKey) .. "  "
+		styleChip(btn, id == state.motionId)
+	end
+	for id, btn in pairs(animChips) do
+		btn.Text = "  " .. t(ANIM_STYLES[id].nameKey) .. "  "
+		styleChip(btn, id == state.animId)
+	end
+	local m = MOTION_STYLES[state.motionId]
+	local a = ANIM_STYLES[state.animId]
+	settingsHint.Text = t(m.nameKey) .. " · " .. t(a.nameKey)
+end
+
+local function makeOptChip(parent, id, label, order, store, onPick)
+	local btn = new("TextButton", {
+		Parent = parent,
+		Size = UDim2.fromOffset(0, 32),
+		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundColor3 = THEME.elevated,
+		Text = "  " .. label .. "  ",
+		Font = THEME.fontBold,
+		TextSize = 11,
+		TextColor3 = THEME.textDim,
+		AutoButtonColor = false,
+		LayoutOrder = order,
+		ZIndex = 27,
+	})
+	corner(9, btn)
+	stroke(THEME.lineSoft, 1, btn, 0.25)
+	btn.MouseButton1Click:Connect(function()
+		onPick(id)
+	end)
+	store[id] = btn
+	return btn
+end
+
+for i, id in ipairs(THEME_ORDER) do
+	makeOptChip(themeRow, id, t(THEME_PACKS[id].nameKey), i, themeChips, function(picked)
+		state.themeId = picked
+		applyTheme(picked)
+		refreshSettingsLabels()
+	end)
+end
+for i, id in ipairs(MOTION_ORDER) do
+	makeOptChip(motionRow, id, t(MOTION_STYLES[id].nameKey), i, motionChips, function(picked)
+		state.motionId = picked
+		applyMotion(picked)
+		refreshSettingsLabels()
+	end)
+end
+for i, id in ipairs(ANIM_ORDER) do
+	makeOptChip(animRow, id, t(ANIM_STYLES[id].nameKey), i, animChips, function(picked)
+		state.animId = picked
+		refreshSettingsLabels()
+	end)
+end
+
 -- выпадающий список языков
 local dropOverlay = new("TextButton", {
 	Parent = root,
@@ -1659,7 +2068,7 @@ local function refreshHistory()
 	histScroll.CanvasSize = UDim2.fromOffset(math.max(totalW, 220), 0)
 end
 
-local function applyUiLang()
+applyUiLang = function()
 	tagline.Text = t("tagline")
 	fromPicker.Caption.Text = t("from")
 	toPicker.Caption.Text = t("to")
@@ -1682,6 +2091,7 @@ local function applyUiLang()
 		chip.BackgroundTransparency = active and 0 or 1
 		chip.TextColor3 = active and THEME.inkOnAccent or THEME.textDim
 	end
+	if refreshSettingsLabels then refreshSettingsLabels() end
 	refreshHistory()
 end
 
@@ -1710,6 +2120,129 @@ for i, code in ipairs(UI_LANGS) do
 		end)
 	end)
 	uiChips[code] = chip
+end
+
+-- применить тему / движение
+applyMotion = function(id)
+	state.motionId = id or state.motionId
+	local style = MOTION_STYLES[state.motionId] or MOTION_STYLES.smooth
+	dragSmooth.follow = style.follow
+	dragSmooth.friction = style.friction
+	if not style.inertia then
+		dragSmooth.velX = 0
+		dragSmooth.velY = 0
+	end
+end
+
+applyTheme = function(id)
+	state.themeId = id or state.themeId
+	copyTheme(state.themeId)
+
+	root.BackgroundColor3 = THEME.bg
+	if rootStroke then rootStroke.Color = THEME.line end
+	if haloStroke then haloStroke.Color = THEME.accent end
+	settingsPanel.BackgroundColor3 = THEME.bg
+	settingsPanel.ScrollBarImageColor3 = THEME.accent
+	brand.TextColor3 = THEME.text
+	tagline.TextColor3 = THEME.textMute
+	brandMark.BackgroundColor3 = THEME.accent
+	grip.BackgroundColor3 = THEME.textMute
+	seg.BackgroundColor3 = THEME.elevated
+	closeBtn.BackgroundColor3 = THEME.elevated
+	closeBtn.TextColor3 = THEME.textDim
+	settingsBtn.BackgroundColor3 = THEME.elevated
+	settingsBtn.TextColor3 = THEME.textDim
+	divider.BackgroundColor3 = THEME.lineSoft
+
+	inputCard.BackgroundColor3 = THEME.field
+	outputCard.BackgroundColor3 = THEME.fieldAlt
+	if inStroke then inStroke.Color = THEME.lineSoft end
+	if outStroke then outStroke.Color = THEME.lineSoft end
+	inputBox.TextColor3 = THEME.text
+	inputBox.PlaceholderColor3 = THEME.textMute
+	charCount.TextColor3 = THEME.textMute
+	outBadge.TextColor3 = THEME.accent
+
+	translateBtn.BackgroundColor3 = THEME.accent
+	translateBtn.TextColor3 = THEME.inkOnAccent
+	copyBtn.BackgroundColor3 = THEME.elevated
+	copyBtn.TextColor3 = THEME.text
+	clearBtn.BackgroundColor3 = THEME.elevated
+	clearBtn.TextColor3 = THEME.textDim
+	swapBtn.BackgroundColor3 = THEME.field
+	swapBtn.TextColor3 = THEME.accent
+	fromPicker.Box.BackgroundColor3 = THEME.elevated
+	toPicker.Box.BackgroundColor3 = THEME.elevated
+	fromPicker.Caption.TextColor3 = THEME.textMute
+	toPicker.Caption.TextColor3 = THEME.textMute
+	fromPicker.Value.TextColor3 = THEME.text
+	toPicker.Value.TextColor3 = THEME.text
+	fromPicker.Chevron.TextColor3 = THEME.accent
+	toPicker.Chevron.TextColor3 = THEME.accent
+
+	statusLbl.TextColor3 = THEME.textMute
+	hintLbl.TextColor3 = THEME.textMute
+	histTitle.TextColor3 = THEME.textDim
+	settingsTitle.TextColor3 = THEME.text
+	backBtn.BackgroundColor3 = THEME.elevated
+	backBtn.TextColor3 = THEME.text
+	themeLbl.TextColor3 = THEME.textDim
+	motionLbl.TextColor3 = THEME.textDim
+	animLbl.TextColor3 = THEME.textDim
+	snowLbl.TextColor3 = THEME.textMute
+	settingsHint.TextColor3 = THEME.textMute
+	dropdown.BackgroundColor3 = THEME.panel
+
+	if feelOpts.translate then
+		feelOpts.translate.baseColor = THEME.accent
+		feelOpts.translate.hoverColor = THEME.accentSoft
+	end
+	if feelOpts.swap then
+		feelOpts.swap.baseColor = THEME.field
+		feelOpts.swap.hoverColor = THEME.hover
+	end
+	if feelOpts.copy then
+		feelOpts.copy.baseColor = THEME.elevated
+		feelOpts.copy.hoverColor = THEME.hover
+	end
+	if feelOpts.clear then
+		feelOpts.clear.baseColor = THEME.elevated
+		feelOpts.clear.hoverColor = THEME.hover
+	end
+	if feelOpts.close then
+		feelOpts.close.baseColor = THEME.elevated
+		feelOpts.close.hoverColor = THEME.danger
+	end
+	if feelOpts.settings then
+		feelOpts.settings.baseColor = THEME.elevated
+		feelOpts.settings.hoverColor = THEME.hover
+	end
+	if feelOpts.back then
+		feelOpts.back.baseColor = THEME.elevated
+		feelOpts.back.hoverColor = THEME.hover
+	end
+
+	local oldPlasma = root:FindFirstChild("Plasma")
+	if oldPlasma then oldPlasma:Destroy() end
+	if atm and atm.connection then
+		pcall(function() atm.connection:Disconnect() end)
+	end
+	atm = makeAtmosphere(root)
+	if atm.setSnow then atm.setSnow(state.snow) end
+
+	if refreshSettingsLabels then refreshSettingsLabels() end
+	if applyUiLang then applyUiLang() end
+end
+
+openSettings = function(on)
+	state.settingsOpen = on
+	settingsPanel.Visible = on
+	body.Visible = not on
+	if on then
+		settingsPanel.BackgroundTransparency = 0.4
+		tween(settingsPanel, THEME.soft, { BackgroundTransparency = 0.08 })
+		refreshSettingsLabels()
+	end
 end
 
 -- клики / хоткеи
@@ -1776,7 +2309,7 @@ local function doTranslate()
 end
 
 translateBtn.MouseButton1Click:Connect(doTranslate)
-bindPressFeel(translateBtn, {
+feelOpts.translate = bindPressFeel(translateBtn, {
 	hoverScale = 1.025,
 	pressScale = 0.97,
 	baseColor = THEME.accent,
@@ -1809,7 +2342,7 @@ swapBtn.MouseButton1Click:Connect(function()
 	end)
 	charCount.Text = tostring(textLen(inputBox.Text)) .. " " .. t("chars")
 end)
-bindPressFeel(swapBtn, {
+feelOpts.swap = bindPressFeel(swapBtn, {
 	hoverScale = 1.08,
 	pressScale = 0.92,
 	baseColor = THEME.field,
@@ -1836,7 +2369,7 @@ copyBtn.MouseButton1Click:Connect(function()
 		setStatus("Clipboard n/a", THEME.danger)
 	end
 end)
-bindPressFeel(copyBtn, {
+feelOpts.copy = bindPressFeel(copyBtn, {
 	baseColor = THEME.elevated,
 	hoverColor = THEME.hover,
 })
@@ -1848,7 +2381,7 @@ clearBtn.MouseButton1Click:Connect(function()
 	charCount.Text = "0 " .. t("chars")
 	setStatus("")
 end)
-bindPressFeel(clearBtn, {
+feelOpts.clear = bindPressFeel(clearBtn, {
 	baseColor = THEME.elevated,
 	hoverColor = THEME.hover,
 })
@@ -1864,7 +2397,7 @@ inputBox.FocusLost:Connect(function()
 	tween(inStroke, THEME.fast, { Color = THEME.lineSoft, Transparency = 0.1 })
 end)
 
-bindPressFeel(closeBtn, {
+feelOpts.close = bindPressFeel(closeBtn, {
 	hoverScale = 1.08,
 	pressScale = 0.9,
 	baseColor = THEME.elevated,
@@ -1883,8 +2416,9 @@ local function setVisible(v)
 	if animatingVis then return end
 	if v == state.visible and root.Visible == v then return end
 
+	local anim = state.animId or "spring"
+
 	if v then
-		-- открытие
 		animatingVis = true
 		state.visible = true
 		root.Visible = true
@@ -1893,27 +2427,82 @@ local function setVisible(v)
 
 		local w, h = winSize.w, winSize.h
 		local p = root.Position
-		root.Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset + 28)
-		rootScale.Scale = 0.88
-		root.BackgroundTransparency = 0.55
-		if haloStroke then haloStroke.Transparency = 1 end
 
-		outputLabel.TextTransparency = 1
-		brand.TextTransparency = 1
-		tagline.TextTransparency = 1
-
-		tween(root, THEME.spring, {
-			Size = UDim2.fromOffset(w, h),
-			BackgroundTransparency = 0,
-			Position = p,
-		})
-		tween(rootScale, THEME.spring, { Scale = 1 })
-		if haloStroke then
-			tween(haloStroke, THEME.soft, { Transparency = 0.88 })
+		if anim == "none" then
+			root.Size = UDim2.fromOffset(w, h)
+			root.BackgroundTransparency = 0
+			rootScale.Scale = 1
+			root.Position = p
+			brand.TextTransparency = 0
+			tagline.TextTransparency = 0
+			outputLabel.TextTransparency = 0
+			if haloStroke then haloStroke.Transparency = 0.88 end
+			animatingVis = false
+		elseif anim == "fade" then
+			root.Size = UDim2.fromOffset(w, h)
+			root.Position = p
+			rootScale.Scale = 1
+			root.BackgroundTransparency = 1
+			brand.TextTransparency = 1
+			tagline.TextTransparency = 1
+			outputLabel.TextTransparency = 1
+			if haloStroke then haloStroke.Transparency = 1 end
+			tween(root, THEME.soft, { BackgroundTransparency = 0 })
+			tween(brand, THEME.soft, { TextTransparency = 0 })
+			tween(tagline, THEME.soft, { TextTransparency = 0 })
+			tween(outputLabel, THEME.soft, { TextTransparency = 0 })
+			if haloStroke then tween(haloStroke, THEME.soft, { Transparency = 0.88 }) end
+			task.delay(0.35, function() animatingVis = false end)
+		elseif anim == "slide" then
+			root.Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset + 80)
+			root.Size = UDim2.fromOffset(w, h)
+			rootScale.Scale = 1
+			root.BackgroundTransparency = 0.3
+			tween(root, THEME.soft, { Position = p, BackgroundTransparency = 0 })
+			brand.TextTransparency = 0
+			tagline.TextTransparency = 0
+			outputLabel.TextTransparency = 0
+			if haloStroke then
+				haloStroke.Transparency = 1
+				tween(haloStroke, THEME.soft, { Transparency = 0.88 })
+			end
+			task.delay(0.4, function() animatingVis = false end)
+		elseif anim == "pop" then
+			root.Position = p
+			root.Size = UDim2.fromOffset(w, h)
+			rootScale.Scale = 0.7
+			root.BackgroundTransparency = 0.4
+			tween(rootScale, THEME.spring, { Scale = 1 })
+			tween(root, THEME.spring, { BackgroundTransparency = 0 })
+			brand.TextTransparency = 0
+			tagline.TextTransparency = 0
+			outputLabel.TextTransparency = 0
+			if haloStroke then
+				haloStroke.Transparency = 1
+				tween(haloStroke, THEME.soft, { Transparency = 0.88 })
+			end
+			task.delay(0.45, function() animatingVis = false end)
+		else
+			-- spring (default)
+			root.Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset + 28)
+			rootScale.Scale = 0.88
+			root.BackgroundTransparency = 0.55
+			if haloStroke then haloStroke.Transparency = 1 end
+			outputLabel.TextTransparency = 1
+			brand.TextTransparency = 1
+			tagline.TextTransparency = 1
+			tween(root, THEME.spring, {
+				Size = UDim2.fromOffset(w, h),
+				BackgroundTransparency = 0,
+				Position = p,
+			})
+			tween(rootScale, THEME.spring, { Scale = 1 })
+			if haloStroke then tween(haloStroke, THEME.soft, { Transparency = 0.88 }) end
+			tween(brand, THEME.soft, { TextTransparency = 0 })
+			tween(tagline, THEME.soft, { TextTransparency = 0 })
+			tween(outputLabel, THEME.soft, { TextTransparency = 0 })
+			task.delay(0.45, function() animatingVis = false end)
 		end
-		tween(brand, THEME.soft, { TextTransparency = 0 })
-		tween(tagline, THEME.soft, { TextTransparency = 0 })
-		tween(outputLabel, THEME.soft, { TextTransparency = 0 })
 
 		dragSmooth.curX = p.X.Offset
 		dragSmooth.curY = p.Y.Offset
@@ -1921,41 +2510,105 @@ local function setVisible(v)
 		dragSmooth.goalY = p.Y.Offset
 		dragSmooth.velX = 0
 		dragSmooth.velY = 0
-
-		task.delay(0.45, function()
-			animatingVis = false
-		end)
 	else
-		-- закрытие
 		animatingVis = true
 		state.visible = false
+		if state.settingsOpen then openSettings(false) end
 		local p = root.Position
-		tween(rootScale, THEME.close, { Scale = 0.9 })
-		tween(root, THEME.close, {
-			BackgroundTransparency = 0.7,
-			Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset + 22),
-		})
-		if haloStroke then
-			tween(haloStroke, THEME.close, { Transparency = 1 })
-		end
-		tween(brand, THEME.close, { TextTransparency = 1 })
-		tween(tagline, THEME.close, { TextTransparency = 1 })
-		tween(outputLabel, THEME.close, { TextTransparency = 1 })
 
-		task.delay(0.3, function()
+		if anim == "none" then
 			root.Visible = false
 			halo.Visible = false
 			if atm then atm.setEnabled(false) end
-			root.Position = p
-			root.BackgroundTransparency = 0
-			rootScale.Scale = 1
-			brand.TextTransparency = 0
-			tagline.TextTransparency = 0
-			outputLabel.TextTransparency = 0
 			animatingVis = false
-		end)
+		elseif anim == "fade" then
+			tween(root, THEME.close, { BackgroundTransparency = 1 })
+			tween(brand, THEME.close, { TextTransparency = 1 })
+			tween(tagline, THEME.close, { TextTransparency = 1 })
+			tween(outputLabel, THEME.close, { TextTransparency = 1 })
+			if haloStroke then tween(haloStroke, THEME.close, { Transparency = 1 }) end
+			task.delay(0.28, function()
+				root.Visible = false
+				halo.Visible = false
+				if atm then atm.setEnabled(false) end
+				root.BackgroundTransparency = 0
+				brand.TextTransparency = 0
+				tagline.TextTransparency = 0
+				outputLabel.TextTransparency = 0
+				animatingVis = false
+			end)
+		elseif anim == "slide" then
+			tween(root, THEME.close, {
+				Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset + 70),
+				BackgroundTransparency = 0.5,
+			})
+			if haloStroke then tween(haloStroke, THEME.close, { Transparency = 1 }) end
+			task.delay(0.3, function()
+				root.Visible = false
+				halo.Visible = false
+				if atm then atm.setEnabled(false) end
+				root.Position = p
+				root.BackgroundTransparency = 0
+				animatingVis = false
+			end)
+		elseif anim == "pop" then
+			tween(rootScale, THEME.close, { Scale = 0.75 })
+			tween(root, THEME.close, { BackgroundTransparency = 0.7 })
+			if haloStroke then tween(haloStroke, THEME.close, { Transparency = 1 }) end
+			task.delay(0.28, function()
+				root.Visible = false
+				halo.Visible = false
+				if atm then atm.setEnabled(false) end
+				rootScale.Scale = 1
+				root.BackgroundTransparency = 0
+				animatingVis = false
+			end)
+		else
+			tween(rootScale, THEME.close, { Scale = 0.9 })
+			tween(root, THEME.close, {
+				BackgroundTransparency = 0.7,
+				Position = UDim2.new(p.X.Scale, p.X.Offset, p.Y.Scale, p.Y.Offset + 22),
+			})
+			if haloStroke then tween(haloStroke, THEME.close, { Transparency = 1 }) end
+			tween(brand, THEME.close, { TextTransparency = 1 })
+			tween(tagline, THEME.close, { TextTransparency = 1 })
+			tween(outputLabel, THEME.close, { TextTransparency = 1 })
+			task.delay(0.3, function()
+				root.Visible = false
+				halo.Visible = false
+				if atm then atm.setEnabled(false) end
+				root.Position = p
+				root.BackgroundTransparency = 0
+				rootScale.Scale = 1
+				brand.TextTransparency = 0
+				tagline.TextTransparency = 0
+				outputLabel.TextTransparency = 0
+				animatingVis = false
+			end)
+		end
 	end
 end
+
+settingsBtn.MouseButton1Click:Connect(function()
+	openSettings(not state.settingsOpen)
+end)
+feelOpts.settings = bindPressFeel(settingsBtn, {
+	hoverScale = 1.08,
+	pressScale = 0.9,
+	baseColor = THEME.elevated,
+	hoverColor = THEME.hover,
+})
+
+backBtn.MouseButton1Click:Connect(function()
+	openSettings(false)
+end)
+feelOpts.back = bindPressFeel(backBtn, { baseColor = THEME.elevated, hoverColor = THEME.hover })
+
+snowBtn.MouseButton1Click:Connect(function()
+	state.snow = not state.snow
+	if atm and atm.setSnow then atm.setSnow(state.snow) end
+	refreshSettingsLabels()
+end)
 
 closeBtn.MouseButton1Click:Connect(function()
 	setVisible(false)
@@ -1968,7 +2621,13 @@ UserInputService.InputBegan:Connect(function(input, gpe)
 	end
 	if not state.visible then return end
 	if input.KeyCode == Enum.KeyCode.Escape then
-		if dropdown.Visible then closeDropdown() else setVisible(false) end
+		if state.settingsOpen then
+			openSettings(false)
+		elseif dropdown.Visible then
+			closeDropdown()
+		else
+			setVisible(false)
+		end
 		return
 	end
 	if gpe then return end
@@ -2023,6 +2682,7 @@ do
 	dragSmooth.goalY = p.Y.Offset
 end
 
+applyMotion(state.motionId)
 applyUiLang()
 setStatus("")
 print("[lingo] загружен, RightShift — меню")
