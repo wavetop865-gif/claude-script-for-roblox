@@ -1,5 +1,5 @@
 --[[
-	blink — тп к HardObby.TouchPart раз в 1 сек
+	blink — тп к HardObby.TouchPart раз в 0.1 сек
 	режимы: обыч (все TouchPart в HardObby) / последний
 	анимка скипается · RightShift — меню
 ]]
@@ -26,7 +26,7 @@ local C = {
 	ok = Color3.fromRGB(110, 210, 160),
 }
 
-local INTERVAL = 1
+local INTERVAL = 0.1
 local FOLDER_NAME = "HardObby"
 local PART_NAME = "TouchPart"
 
@@ -294,7 +294,7 @@ local sub = new("TextLabel", {
 	TextSize = 11,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	TextColor3 = C.mute,
-	Text = "HardObby.TouchPart · 1 сек",
+	Text = "HardObby.TouchPart · 0.1 сек",
 	ZIndex = 2,
 })
 
@@ -354,13 +354,13 @@ local function refreshModeUI()
 		modeNormal.TextColor3 = C.ink
 		modeLast.BackgroundColor3 = C.elev
 		modeLast.TextColor3 = C.mute
-		sub.Text = "TouchPart по кругу · 1 сек"
+		sub.Text = "TouchPart по кругу · 0.1 сек"
 	else
 		modeLast.BackgroundColor3 = C.accent
 		modeLast.TextColor3 = C.ink
 		modeNormal.BackgroundColor3 = C.elev
 		modeNormal.TextColor3 = C.mute
-		sub.Text = "последний TouchPart · 1 сек"
+		sub.Text = "последний TouchPart · 0.1 сек"
 	end
 end
 
