@@ -101,6 +101,16 @@ local THEME_PACKS = {
 
 local THEME_ORDER = { "apricot", "mint", "ocean", "rose" }
 
+-- раскладки интерфейса
+local LAYOUT_STYLES = {
+	classic = { nameKey = "layoutClassic" },
+	split = { nameKey = "layoutSplit" },
+	compact = { nameKey = "layoutCompact" },
+	focus = { nameKey = "layoutFocus" },
+	board = { nameKey = "layoutBoard" },
+}
+local LAYOUT_ORDER = { "classic", "split", "compact", "focus", "board" }
+
 -- как окно ездит по экрану
 local MOTION_STYLES = {
 	smooth = { nameKey = "motionSmooth", follow = 18, friction = 8, dragScale = 1.018, inertia = true },
@@ -121,6 +131,90 @@ local ANIM_STYLES = {
 }
 local ANIM_ORDER = { "spring", "slide", "fade", "pop", "none" }
 
+-- цвет → hsv / обратно, чтобы из одного акцента собрать всю палитру
+local function clamp01(x)
+	return math.clamp(x, 0, 1)
+end
+
+local function rgbToHsv(c)
+	local r, g, b = c.R, c.G, c.B
+	local maxv = math.max(r, g, b)
+	local minv = math.min(r, g, b)
+	local d = maxv - minv
+	local h = 0
+	if d > 1e-6 then
+		if maxv == r then
+			h = ((g - b) / d) % 6
+		elseif maxv == g then
+			h = (b - r) / d + 2
+		else
+			h = (r - g) / d + 4
+		end
+		h /= 6
+		if h < 0 then h += 1 end
+	end
+	local s = maxv <= 1e-6 and 0 or d / maxv
+	return h, s, maxv
+end
+
+local function hsvToRgb(h, s, v)
+	h = h % 1
+	s = clamp01(s)
+	v = clamp01(v)
+	local i = math.floor(h * 6)
+	local f = h * 6 - i
+	local p = v * (1 - s)
+	local q = v * (1 - f * s)
+	local t = v * (1 - (1 - f) * s)
+	local r, g, b = 0, 0, 0
+	local m = i % 6
+	if m == 0 then r, g, b = v, t, p
+	elseif m == 1 then r, g, b = q, v, p
+	elseif m == 2 then r, g, b = p, v, t
+	elseif m == 3 then r, g, b = p, q, v
+	elseif m == 4 then r, g, b = t, p, v
+	else r, g, b = v, p, q end
+	return Color3.new(r, g, b)
+end
+
+local function luminance(c)
+	return c.R * 0.2126 + c.G * 0.7152 + c.B * 0.0722
+end
+
+-- из одного цвета делаем bg / поля / accent soft-deep, не один сплошной
+local function buildPaletteFromAccent(accent)
+	local h, s, v = rgbToHsv(accent)
+	s = math.max(s, 0.35)
+	v = math.clamp(v, 0.45, 1)
+
+	local accentCol = hsvToRgb(h, s, v)
+	local accentSoft = hsvToRgb(h, s * 0.55, math.min(1, v * 1.12 + 0.06))
+	local accentDeep = hsvToRgb(h, math.min(1, s * 1.15), v * 0.52)
+	local ink = luminance(accentCol) > 0.58
+		and Color3.fromRGB(22, 16, 12)
+		or Color3.fromRGB(248, 246, 242)
+
+	return {
+		bg = hsvToRgb(h, 0.28, 0.045),
+		panel = hsvToRgb(h, 0.24, 0.075),
+		elevated = hsvToRgb(h, 0.2, 0.125),
+		field = hsvToRgb(h, 0.26, 0.06),
+		fieldAlt = hsvToRgb(h, 0.22, 0.085),
+		hover = hsvToRgb(h, 0.22, 0.17),
+		line = hsvToRgb(h, 0.2, 0.24),
+		lineSoft = hsvToRgb(h, 0.18, 0.17),
+		accent = accentCol,
+		accentDeep = accentDeep,
+		accentSoft = accentSoft,
+		inkOnAccent = ink,
+		ok = hsvToRgb(0.38, 0.5, 0.78),
+		danger = Color3.fromRGB(235, 100, 110),
+		text = hsvToRgb(h, 0.05, 0.94),
+		textDim = hsvToRgb(h, 0.1, 0.62),
+		textMute = hsvToRgb(h, 0.12, 0.4),
+	}
+end
+
 local function copyTheme(id)
 	local pack = THEME_PACKS[id] or THEME_PACKS.apricot
 	for k, v in pairs(pack) do
@@ -140,6 +234,13 @@ local function copyTheme(id)
 	THEME.close = TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
 end
 
+local function applyGeneratedToTheme(accent)
+	local pal = buildPaletteFromAccent(accent)
+	for k, v in pairs(pal) do
+		THEME[k] = v
+	end
+end
+
 copyTheme("apricot")
 
 -- состояние (объявляем рано — drag/плазма замыкают именно этот local)
@@ -151,11 +252,17 @@ local state = {
 	history = {},
 	visible = true,
 	themeId = "apricot",
+	layoutId = "classic",
 	motionId = "smooth",
 	animId = "spring",
 	snow = true,
 	settingsOpen = false,
 	outputPlaceholder = true,
+	useCustomColor = false,
+	customAccent = Color3.fromRGB(255, 156, 102),
+	pickerH = 0.07,
+	pickerS = 0.6,
+	pickerV = 1,
 }
 
 local WIN_W, WIN_H = 580, 540
@@ -190,12 +297,21 @@ local I18N = {
 		hint        = "тяни края · шапку · RightShift",
 		settings    = "Настройки",
 		theme       = "Тема",
+		layout      = "Интерфейс",
+		uiColor     = "Цвет UI",
+		colorReset  = "Сброс цвета",
+		colorHint   = "из одного цвета сам соберёт тёмные и светлые",
 		motion      = "Перемещение",
 		anim        = "Анимация",
 		themeApricot = "Абрикос",
 		themeMint    = "Мята",
 		themeOcean   = "Океан",
 		themeRose    = "Роза",
+		layoutClassic = "Классика",
+		layoutSplit   = "Сплит",
+		layoutCompact = "Компакт",
+		layoutFocus   = "Фокус",
+		layoutBoard   = "Карты",
 		motionSmooth = "Плавно",
 		motionSnappy = "Резко",
 		motionHeavy  = "Тяжело",
@@ -234,12 +350,21 @@ local I18N = {
 		hint        = "drag edges · header · RightShift",
 		settings    = "Settings",
 		theme       = "Theme",
+		layout      = "Layout",
+		uiColor     = "UI color",
+		colorReset  = "Reset color",
+		colorHint   = "builds dark/light shades from one color",
 		motion      = "Movement",
 		anim        = "Animation",
 		themeApricot = "Apricot",
 		themeMint    = "Mint",
 		themeOcean   = "Ocean",
 		themeRose    = "Rose",
+		layoutClassic = "Classic",
+		layoutSplit   = "Split",
+		layoutCompact = "Compact",
+		layoutFocus   = "Focus",
+		layoutBoard   = "Cards",
 		motionSmooth = "Smooth",
 		motionSnappy = "Snappy",
 		motionHeavy  = "Heavy",
@@ -278,12 +403,21 @@ local I18N = {
 		hint        = "тягни краї · шапку · RightShift",
 		settings    = "Налаштування",
 		theme       = "Тема",
+		layout      = "Інтерфейс",
+		uiColor     = "Колір UI",
+		colorReset  = "Скинути колір",
+		colorHint   = "з одного кольору збере темні й світлі",
 		motion      = "Переміщення",
 		anim        = "Анімація",
 		themeApricot = "Абрикос",
 		themeMint    = "М’ята",
 		themeOcean   = "Океан",
 		themeRose    = "Троянда",
+		layoutClassic = "Класика",
+		layoutSplit   = "Спліт",
+		layoutCompact = "Компакт",
+		layoutFocus   = "Фокус",
+		layoutBoard   = "Картки",
 		motionSmooth = "Плавно",
 		motionSnappy = "Різко",
 		motionHeavy  = "Важко",
@@ -1074,7 +1208,7 @@ local function translateText(text, sl, tl)
 end
 
 -- состояние уже выше
-local applyTheme, applyMotion, refreshSettingsLabels, openSettings, applyUiLang
+local applyTheme, applyMotion, applyLayout, refreshSettingsLabels, openSettings, applyUiLang
 local feelOpts = {}
 
 local function t(key)
@@ -1819,13 +1953,286 @@ local function makeSettingsSection(titleKey, y)
 end
 
 local themeLbl, themeRow = makeSettingsSection("theme", 44)
-local motionLbl, motionRow = makeSettingsSection("motion", 140)
-local animLbl, animRow = makeSettingsSection("anim", 236)
+local colorLbl = new("TextLabel", {
+	Parent = settingsPanel,
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 140),
+	Size = UDim2.new(1, 0, 0, 18),
+	Font = THEME.fontBold,
+	TextSize = 12,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextColor3 = THEME.textDim,
+	Text = t("uiColor"),
+	ZIndex = 26,
+})
+
+local colorBox = new("Frame", {
+	Parent = settingsPanel,
+	Position = UDim2.fromOffset(0, 162),
+	Size = UDim2.new(1, 0, 0, 128),
+	BackgroundColor3 = THEME.elevated,
+	BorderSizePixel = 0,
+	ZIndex = 26,
+})
+corner(14, colorBox)
+pad(10, 12, 10, 12, colorBox)
+local colorBoxStroke = stroke(THEME.lineSoft, 1, colorBox, 0.2)
+
+local function makeHueGradient()
+	local keys = {}
+	for i = 0, 6 do
+		keys[#keys + 1] = ColorSequenceKeypoint.new(i / 6, hsvToRgb(i / 6, 1, 1))
+	end
+	return ColorSequence.new(keys)
+end
+
+local hueBar = new("Frame", {
+	Parent = colorBox,
+	Size = UDim2.new(1, -96, 0, 16),
+	Position = UDim2.fromOffset(0, 0),
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BorderSizePixel = 0,
+	Active = true,
+	ZIndex = 27,
+})
+corner(6, hueBar)
+new("UIGradient", { Parent = hueBar, Color = makeHueGradient() })
+local hueKnob = new("Frame", {
+	Parent = hueBar,
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(state.pickerH, 0.5),
+	Size = UDim2.fromOffset(10, 20),
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BorderSizePixel = 0,
+	Active = true,
+	ZIndex = 28,
+})
+corner(4, hueKnob)
+stroke(Color3.fromRGB(20, 20, 24), 1, hueKnob, 0)
+
+local satBar = new("Frame", {
+	Parent = colorBox,
+	Size = UDim2.new(1, -96, 0, 14),
+	Position = UDim2.fromOffset(0, 24),
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BorderSizePixel = 0,
+	Active = true,
+	ZIndex = 27,
+})
+corner(6, satBar)
+local satGrad = new("UIGradient", {
+	Parent = satBar,
+	Color = ColorSequence.new(Color3.new(1, 1, 1), hsvToRgb(state.pickerH, 1, state.pickerV)),
+})
+local satKnob = new("Frame", {
+	Parent = satBar,
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(state.pickerS, 0.5),
+	Size = UDim2.fromOffset(10, 18),
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BorderSizePixel = 0,
+	Active = true,
+	ZIndex = 28,
+})
+corner(4, satKnob)
+stroke(Color3.fromRGB(20, 20, 24), 1, satKnob, 0)
+
+local valBar = new("Frame", {
+	Parent = colorBox,
+	Size = UDim2.new(1, -96, 0, 14),
+	Position = UDim2.fromOffset(0, 46),
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BorderSizePixel = 0,
+	Active = true,
+	ZIndex = 27,
+})
+corner(6, valBar)
+local valGrad = new("UIGradient", {
+	Parent = valBar,
+	Color = ColorSequence.new(Color3.new(0, 0, 0), hsvToRgb(state.pickerH, state.pickerS, 1)),
+})
+local valKnob = new("Frame", {
+	Parent = valBar,
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(state.pickerV, 0.5),
+	Size = UDim2.fromOffset(10, 18),
+	BackgroundColor3 = Color3.new(1, 1, 1),
+	BorderSizePixel = 0,
+	Active = true,
+	ZIndex = 28,
+})
+corner(4, valKnob)
+stroke(Color3.fromRGB(20, 20, 24), 1, valKnob, 0)
+
+local accentPreview = new("Frame", {
+	Parent = colorBox,
+	AnchorPoint = Vector2.new(1, 0),
+	Position = UDim2.new(1, 0, 0, 0),
+	Size = UDim2.fromOffset(80, 60),
+	BackgroundColor3 = THEME.accent,
+	BorderSizePixel = 0,
+	ZIndex = 27,
+})
+corner(12, accentPreview)
+local accentPreviewStroke = stroke(THEME.line, 1, accentPreview, 0.15)
+
+local paletteRow = new("Frame", {
+	Parent = colorBox,
+	Position = UDim2.fromOffset(0, 70),
+	Size = UDim2.new(1, 0, 0, 18),
+	BackgroundTransparency = 1,
+	ZIndex = 27,
+})
+new("UIListLayout", {
+	Parent = paletteRow,
+	FillDirection = Enum.FillDirection.Horizontal,
+	Padding = UDim.new(0, 6),
+	SortOrder = Enum.SortOrder.LayoutOrder,
+})
+
+local paletteSwatches = {}
+for i = 1, 6 do
+	local sw = new("Frame", {
+		Parent = paletteRow,
+		Size = UDim2.fromOffset(28, 18),
+		BackgroundColor3 = THEME.bg,
+		BorderSizePixel = 0,
+		LayoutOrder = i,
+		ZIndex = 28,
+	})
+	corner(5, sw)
+	paletteSwatches[i] = sw
+end
+
+local colorHintLbl = new("TextLabel", {
+	Parent = colorBox,
+	BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(0, 94),
+	Size = UDim2.new(1, -100, 0, 24),
+	Font = THEME.fontLight,
+	TextSize = 11,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Top,
+	TextColor3 = THEME.textMute,
+	TextWrapped = true,
+	Text = t("colorHint"),
+	ZIndex = 27,
+})
+
+local colorResetBtn = new("TextButton", {
+	Parent = colorBox,
+	AnchorPoint = Vector2.new(1, 1),
+	Position = UDim2.new(1, 0, 1, 0),
+	Size = UDim2.fromOffset(96, 26),
+	BackgroundColor3 = THEME.field,
+	Text = t("colorReset"),
+	Font = THEME.fontBold,
+	TextSize = 11,
+	TextColor3 = THEME.textDim,
+	AutoButtonColor = false,
+	ZIndex = 27,
+})
+corner(8, colorResetBtn)
+
+local function refreshPickerVisuals()
+	local accent = hsvToRgb(state.pickerH, state.pickerS, state.pickerV)
+	accentPreview.BackgroundColor3 = accent
+	satGrad.Color = ColorSequence.new(Color3.new(1, 1, 1), hsvToRgb(state.pickerH, 1, state.pickerV))
+	valGrad.Color = ColorSequence.new(Color3.new(0, 0, 0), hsvToRgb(state.pickerH, state.pickerS, 1))
+	hueKnob.Position = UDim2.fromScale(state.pickerH, 0.5)
+	satKnob.Position = UDim2.fromScale(state.pickerS, 0.5)
+	valKnob.Position = UDim2.fromScale(state.pickerV, 0.5)
+	local pal = buildPaletteFromAccent(accent)
+	local order = { "bg", "elevated", "field", "accentDeep", "accent", "accentSoft" }
+	for i, key in ipairs(order) do
+		if paletteSwatches[i] then
+			paletteSwatches[i].BackgroundColor3 = pal[key]
+		end
+	end
+end
+
+local function bindValueSlider(bar, knob, getSet)
+	local dragging = false
+	local function setFromX(x)
+		local rel = 0
+		local abs = bar.AbsoluteSize.X
+		if abs > 1 then
+			rel = math.clamp((x - bar.AbsolutePosition.X) / abs, 0, 1)
+		end
+		getSet(rel)
+		refreshPickerVisuals()
+		state.useCustomColor = true
+		state.customAccent = hsvToRgb(state.pickerH, state.pickerS, state.pickerV)
+		-- при драге не трогаем плазму — иначе лагает
+		if applyTheme then
+			applyTheme(state.themeId, { skipAtmosphere = true, skipLabels = true })
+		end
+	end
+	local function endDrag()
+		if not dragging then return end
+		dragging = false
+		if applyTheme then
+			applyTheme(state.themeId)
+		end
+	end
+	bar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			setFromX(input.Position.X)
+		end
+	end)
+	bar.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			endDrag()
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if not dragging then return end
+		if input.UserInputType == Enum.UserInputType.MouseMovement
+			or input.UserInputType == Enum.UserInputType.Touch then
+			setFromX(input.Position.X)
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			endDrag()
+		end
+	end)
+	knob.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+		end
+	end)
+end
+
+bindValueSlider(hueBar, hueKnob, function(v) state.pickerH = v end)
+bindValueSlider(satBar, satKnob, function(v) state.pickerS = v end)
+bindValueSlider(valBar, valKnob, function(v) state.pickerV = v end)
+refreshPickerVisuals()
+
+colorResetBtn.MouseButton1Click:Connect(function()
+	state.useCustomColor = false
+	local pack = THEME_PACKS[state.themeId] or THEME_PACKS.apricot
+	local h, s, v = rgbToHsv(pack.accent)
+	state.pickerH, state.pickerS, state.pickerV = h, s, v
+	state.customAccent = pack.accent
+	refreshPickerVisuals()
+	if applyTheme then applyTheme(state.themeId) end
+	if refreshSettingsLabels then refreshSettingsLabels() end
+end)
+
+local layoutLbl, layoutRow = makeSettingsSection("layout", 306)
+local motionLbl, motionRow = makeSettingsSection("motion", 402)
+local animLbl, animRow = makeSettingsSection("anim", 498)
 
 local snowLbl = new("TextLabel", {
 	Parent = settingsPanel,
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(0, 332),
+	Position = UDim2.fromOffset(0, 594),
 	Size = UDim2.new(0.5, 0, 0, 18),
 	Font = THEME.fontBold,
 	TextSize = 12,
@@ -1837,7 +2244,7 @@ local snowLbl = new("TextLabel", {
 
 local snowBtn = new("TextButton", {
 	Parent = settingsPanel,
-	Position = UDim2.fromOffset(0, 354),
+	Position = UDim2.fromOffset(0, 616),
 	Size = UDim2.fromOffset(90, 32),
 	BackgroundColor3 = THEME.accent,
 	Text = t("on"),
@@ -1852,7 +2259,7 @@ corner(10, snowBtn)
 local settingsHint = new("TextLabel", {
 	Parent = settingsPanel,
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(0, 400),
+	Position = UDim2.fromOffset(0, 662),
 	Size = UDim2.new(1, 0, 0, 48),
 	Font = THEME.fontLight,
 	TextSize = 12,
@@ -1865,6 +2272,7 @@ local settingsHint = new("TextLabel", {
 })
 
 local themeChips = {}
+local layoutChips = {}
 local motionChips = {}
 local animChips = {}
 
@@ -1882,14 +2290,28 @@ refreshSettingsLabels = function()
 	settingsTitle.Text = t("settings")
 	backBtn.Text = t("back")
 	themeLbl.Text = t("theme")
+	colorLbl.Text = t("uiColor")
+	colorHintLbl.Text = t("colorHint")
+	colorResetBtn.Text = t("colorReset")
+	layoutLbl.Text = t("layout")
 	motionLbl.Text = t("motion")
 	animLbl.Text = t("anim")
 	snowLbl.Text = t("snow")
 	snowBtn.Text = state.snow and t("on") or t("off")
 	styleChip(snowBtn, state.snow)
+	colorBox.BackgroundColor3 = THEME.elevated
+	if colorBoxStroke then colorBoxStroke.Color = THEME.lineSoft end
+	if accentPreviewStroke then accentPreviewStroke.Color = THEME.line end
+	colorResetBtn.BackgroundColor3 = THEME.field
+	colorResetBtn.TextColor3 = THEME.textDim
+	colorHintLbl.TextColor3 = THEME.textMute
 	for id, btn in pairs(themeChips) do
 		btn.Text = "  " .. t(THEME_PACKS[id].nameKey) .. "  "
-		styleChip(btn, id == state.themeId)
+		styleChip(btn, (not state.useCustomColor) and id == state.themeId)
+	end
+	for id, btn in pairs(layoutChips) do
+		btn.Text = "  " .. t(LAYOUT_STYLES[id].nameKey) .. "  "
+		styleChip(btn, id == state.layoutId)
 	end
 	for id, btn in pairs(motionChips) do
 		btn.Text = "  " .. t(MOTION_STYLES[id].nameKey) .. "  "
@@ -1899,9 +2321,12 @@ refreshSettingsLabels = function()
 		btn.Text = "  " .. t(ANIM_STYLES[id].nameKey) .. "  "
 		styleChip(btn, id == state.animId)
 	end
+	local L = LAYOUT_STYLES[state.layoutId]
 	local m = MOTION_STYLES[state.motionId]
 	local a = ANIM_STYLES[state.animId]
-	settingsHint.Text = t(m.nameKey) .. " · " .. t(a.nameKey)
+	settingsHint.Text = t(L.nameKey) .. " · " .. t(m.nameKey) .. " · " .. t(a.nameKey)
+		.. (state.useCustomColor and (" · " .. t("uiColor")) or "")
+	refreshPickerVisuals()
 end
 
 local function makeOptChip(parent, id, label, order, store, onPick)
@@ -1930,7 +2355,19 @@ end
 for i, id in ipairs(THEME_ORDER) do
 	makeOptChip(themeRow, id, t(THEME_PACKS[id].nameKey), i, themeChips, function(picked)
 		state.themeId = picked
+		state.useCustomColor = false
+		local pack = THEME_PACKS[picked]
+		local h, s, v = rgbToHsv(pack.accent)
+		state.pickerH, state.pickerS, state.pickerV = h, s, v
+		state.customAccent = pack.accent
 		applyTheme(picked)
+		refreshSettingsLabels()
+	end)
+end
+for i, id in ipairs(LAYOUT_ORDER) do
+	makeOptChip(layoutRow, id, t(LAYOUT_STYLES[id].nameKey), i, layoutChips, function(picked)
+		state.layoutId = picked
+		applyLayout(picked)
 		refreshSettingsLabels()
 	end)
 end
@@ -2171,7 +2608,7 @@ for i, code in ipairs(UI_LANGS) do
 	uiChips[code] = chip
 end
 
--- применить тему / движение
+-- применить тему / движение / раскладку
 applyMotion = function(id)
 	state.motionId = id or state.motionId
 	local style = MOTION_STYLES[state.motionId] or MOTION_STYLES.smooth
@@ -2183,9 +2620,99 @@ applyMotion = function(id)
 	end
 end
 
-applyTheme = function(id)
+local function setCornerRadius(inst, r)
+	local c = inst and inst:FindFirstChildOfClass("UICorner")
+	if c then c.CornerRadius = UDim.new(0, r) end
+end
+
+applyLayout = function(id)
+	state.layoutId = id or state.layoutId
+	local L = state.layoutId or "classic"
+
+	-- дефолт
+	langRow.Position = UDim2.fromOffset(0, 0)
+	langRow.Size = UDim2.new(1, 0, 0, 56)
+	fromPicker.Box.Size = UDim2.new(0.42, 0, 1, 0)
+	fromPicker.Box.Position = UDim2.fromScale(0, 0)
+	toPicker.Box.Size = UDim2.new(0.42, 0, 1, 0)
+	toPicker.Box.Position = UDim2.new(0.58, 0, 0, 0)
+	swapBtn.Size = UDim2.fromOffset(44, 44)
+	swapBtn.Visible = true
+	fields.Position = UDim2.fromOffset(0, 68)
+	fields.Size = UDim2.new(1, 0, 1, -188)
+	inputCard.Position = UDim2.fromOffset(0, 0)
+	inputCard.Size = UDim2.new(1, 0, 0.5, -6)
+	outputCard.Position = UDim2.new(0, 0, 0.5, 6)
+	outputCard.Size = UDim2.new(1, 0, 0.5, -6)
+	footer.Size = UDim2.new(1, 0, 0, 120)
+	footer.Visible = true
+	actionRow.Size = UDim2.new(1, 0, 0, 46)
+	histTitle.Visible = true
+	histScroll.Visible = true
+	histTitle.Position = UDim2.fromOffset(0, 74)
+	histScroll.Position = UDim2.fromOffset(0, 90)
+	setCornerRadius(inputCard, 18)
+	setCornerRadius(outputCard, 18)
+	setCornerRadius(translateBtn, 14)
+	setCornerRadius(fromPicker.Box, 16)
+	setCornerRadius(toPicker.Box, 16)
+
+	if L == "split" then
+		langRow.Size = UDim2.new(1, 0, 0, 48)
+		fields.Position = UDim2.fromOffset(0, 56)
+		fields.Size = UDim2.new(1, 0, 1, -176)
+		inputCard.Position = UDim2.fromOffset(0, 0)
+		inputCard.Size = UDim2.new(0.5, -6, 1, 0)
+		outputCard.Position = UDim2.new(0.5, 6, 0, 0)
+		outputCard.Size = UDim2.new(0.5, -6, 1, 0)
+		footer.Size = UDim2.new(1, 0, 0, 110)
+	elseif L == "compact" then
+		langRow.Size = UDim2.new(1, 0, 0, 44)
+		swapBtn.Size = UDim2.fromOffset(36, 36)
+		fields.Position = UDim2.fromOffset(0, 52)
+		fields.Size = UDim2.new(1, 0, 1, -162)
+		footer.Size = UDim2.new(1, 0, 0, 100)
+		actionRow.Size = UDim2.new(1, 0, 0, 40)
+		histTitle.Position = UDim2.fromOffset(0, 58)
+		histScroll.Position = UDim2.fromOffset(0, 72)
+		setCornerRadius(inputCard, 12)
+		setCornerRadius(outputCard, 12)
+		setCornerRadius(translateBtn, 10)
+	elseif L == "focus" then
+		langRow.Size = UDim2.new(1, 0, 0, 40)
+		swapBtn.Size = UDim2.fromOffset(34, 34)
+		fields.Position = UDim2.fromOffset(0, 48)
+		fields.Size = UDim2.new(1, 0, 1, -128)
+		footer.Size = UDim2.new(1, 0, 0, 72)
+		actionRow.Size = UDim2.new(1, 0, 0, 46)
+		histTitle.Visible = false
+		histScroll.Visible = false
+		inputCard.Size = UDim2.new(1, 0, 0.55, -6)
+		outputCard.Position = UDim2.new(0, 0, 0.55, 6)
+		outputCard.Size = UDim2.new(1, 0, 0.45, -6)
+	elseif L == "board" then
+		langRow.Size = UDim2.new(1, 0, 0, 52)
+		fields.Position = UDim2.fromOffset(0, 64)
+		fields.Size = UDim2.new(1, 0, 1, -196)
+		inputCard.Size = UDim2.new(1, 0, 0.48, -8)
+		outputCard.Position = UDim2.new(0, 0, 0.48, 8)
+		outputCard.Size = UDim2.new(1, 0, 0.52, -8)
+		footer.Size = UDim2.new(1, 0, 0, 124)
+		setCornerRadius(inputCard, 22)
+		setCornerRadius(outputCard, 22)
+		setCornerRadius(translateBtn, 16)
+		setCornerRadius(fromPicker.Box, 18)
+		setCornerRadius(toPicker.Box, 18)
+	end
+end
+
+applyTheme = function(id, opts)
+	opts = opts or {}
 	state.themeId = id or state.themeId
 	copyTheme(state.themeId)
+	if state.useCustomColor and state.customAccent then
+		applyGeneratedToTheme(state.customAccent)
+	end
 
 	root.BackgroundColor3 = THEME.bg
 	if rootStroke then rootStroke.Color = THEME.line end
@@ -2257,12 +2784,22 @@ applyTheme = function(id)
 	backBtn.BackgroundColor3 = THEME.elevated
 	backBtn.TextColor3 = THEME.text
 	themeLbl.TextColor3 = THEME.textDim
+	colorLbl.TextColor3 = THEME.textDim
+	layoutLbl.TextColor3 = THEME.textDim
 	motionLbl.TextColor3 = THEME.textDim
 	animLbl.TextColor3 = THEME.textDim
 	snowLbl.TextColor3 = THEME.textMute
 	settingsHint.TextColor3 = THEME.textMute
 	dropdown.BackgroundColor3 = THEME.panel
 	dropdown.ScrollBarImageColor3 = THEME.accent
+	colorBox.BackgroundColor3 = THEME.elevated
+	if colorBoxStroke then colorBoxStroke.Color = THEME.lineSoft end
+	if accentPreviewStroke then accentPreviewStroke.Color = THEME.line end
+	colorResetBtn.BackgroundColor3 = THEME.field
+	colorResetBtn.TextColor3 = THEME.textDim
+	colorHintLbl.TextColor3 = THEME.textMute
+	snowBtn.BackgroundColor3 = state.snow and THEME.accent or THEME.elevated
+	snowBtn.TextColor3 = state.snow and THEME.inkOnAccent or THEME.textDim
 
 	for _, look in ipairs(resizeLooks) do
 		if look.chip then look.chip.BackgroundColor3 = THEME.accent end
@@ -2298,18 +2835,23 @@ applyTheme = function(id)
 		feelOpts.back.hoverColor = THEME.hover
 	end
 
-	-- сначала отключаем тик, потом удаляем плазму
-	if atm and atm.connection then
-		pcall(function() atm.connection:Disconnect() end)
-		atm.connection = nil
+	if not opts.skipAtmosphere then
+		if atm and atm.connection then
+			pcall(function() atm.connection:Disconnect() end)
+			atm.connection = nil
+		end
+		local oldPlasma = root:FindFirstChild("Plasma")
+		if oldPlasma then oldPlasma:Destroy() end
+		atm = makeAtmosphere(root)
+		if atm.setSnow then atm.setSnow(state.snow) end
 	end
-	local oldPlasma = root:FindFirstChild("Plasma")
-	if oldPlasma then oldPlasma:Destroy() end
-	atm = makeAtmosphere(root)
-	if atm.setSnow then atm.setSnow(state.snow) end
 
-	if refreshSettingsLabels then refreshSettingsLabels() end
-	if applyUiLang then applyUiLang() end
+	if not opts.skipLabels and refreshSettingsLabels then
+		refreshSettingsLabels()
+	end
+	if not opts.skipLabels and applyUiLang then
+		applyUiLang()
+	end
 end
 
 openSettings = function(on)
@@ -2802,6 +3344,7 @@ do
 end
 
 applyMotion(state.motionId)
+applyLayout(state.layoutId)
 applyUiLang()
 setStatus("")
 print("[lingo] загружен, RightShift — меню")
