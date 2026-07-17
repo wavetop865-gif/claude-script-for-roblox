@@ -1,441 +1,407 @@
 --[[
-	pad — HardObby.TouchPart
-	вставь ЦЕЛИКОМ в execute (без HttpGet)
-	RightShift — меню
+  HardObby.TouchPart — TP каждые 0.1с
+  Режимы: Обыч / Последний
+  RightShift — скрыть/показать
 ]]
 
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local LP = Players.LocalPlayer
+local INTERVAL = 0.1
+local TP_HEIGHT = 7 -- чуть выше пада
 
-local C = {
-	bg = Color3.fromRGB(14, 12, 18),
-	elev = Color3.fromRGB(32, 28, 42),
-	line = Color3.fromRGB(58, 48, 72),
-	accent = Color3.fromRGB(255, 140, 90),
-	accentDim = Color3.fromRGB(180, 80, 50),
-	ink = Color3.fromRGB(28, 14, 10),
-	off = Color3.fromRGB(72, 68, 82),
-	text = Color3.fromRGB(245, 238, 232),
-	mute = Color3.fromRGB(140, 128, 138),
-	danger = Color3.fromRGB(235, 100, 110),
-	ok = Color3.fromRGB(120, 210, 150),
-}
-
-local enabled = false
-local visible = true
-local cached = nil
-local noclipConn = nil
-
-local function new(class, props)
-	local i = Instance.new(class)
-	for k, v in pairs(props or {}) do i[k] = v end
-	return i
+local gui = Instance.new("ScreenGui")
+gui.Name = "HardObbyTP"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+pcall(function()
+	gui.Parent = game:GetService("CoreGui")
+end)
+if not gui.Parent then
+	gui.Parent = LP:WaitForChild("PlayerGui")
 end
 
-local function corner(r, p)
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, r)
-	c.Parent = p
-	return c
-end
+local frame = Instance.new("Frame")
+frame.Name = "Panel"
+frame.Size = UDim2.new(0, 200, 0, 168)
+frame.Position = UDim2.new(0, 18, 0.5, -84)
+frame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Parent = gui
 
-local function stroke(col, th, p, tr)
-	local s = Instance.new("UIStroke")
-	s.Color = col
-	s.Thickness = th or 1
-	s.Transparency = tr or 0
-	s.Parent = p
-	return s
-end
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = frame
 
-local function tween(obj, t, props)
-	TweenService:Create(obj, TweenInfo.new(t, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), props):Play()
-end
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(55, 55, 65)
+stroke.Thickness = 1
+stroke.Parent = frame
 
-local function findPad(force)
-	if not force and cached and cached.Parent and cached:IsA("BasePart") then
-		return cached
-	end
-	cached = nil
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -16, 0, 26)
+title.Position = UDim2.new(0, 8, 0, 6)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextColor3 = Color3.fromRGB(235, 235, 245)
+title.Text = "HardObby Pad"
+title.Parent = frame
 
-	local function take(part)
-		if part and part:IsA("BasePart") then
-			cached = part
-			return part
-		end
-	end
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, -16, 0, 18)
+status.Position = UDim2.new(0, 8, 0, 30)
+status.BackgroundTransparency = 1
+status.Font = Enum.Font.Gotham
+status.TextSize = 11
+status.TextXAlignment = Enum.TextXAlignment.Left
+status.TextColor3 = Color3.fromRGB(140, 140, 155)
+status.Text = "ищем TouchPart…"
+status.Parent = frame
 
-	-- прямые пути
-	local hard = workspace:FindFirstChild("HardObby")
-	if hard then
-		local p = take(hard:FindFirstChild("TouchPart"))
-		if p then return p end
-	end
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(1, -16, 0, 34)
+toggleBtn.Position = UDim2.new(0, 8, 0, 54)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
+toggleBtn.BorderSizePixel = 0
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 14
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Text = "ВКЛ"
+toggleBtn.AutoButtonColor = false
+toggleBtn.Parent = frame
 
-	hard = workspace:FindFirstChild("HardObby", true)
-	if hard then
-		local p = take(hard:FindFirstChild("TouchPart")) or take(hard:FindFirstChild("TouchPart", true))
-		if p then return p end
-	end
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(0, 8)
+toggleCorner.Parent = toggleBtn
 
-	-- полный скан
-	for _, obj in ipairs(workspace:GetDescendants()) do
-		if obj.Name == "HardObby" then
-			local p = obj:FindFirstChild("TouchPart") or obj:FindFirstChild("TouchPart", true)
-			if take(p) then return cached end
-		end
-	end
+local modeBtn = Instance.new("TextButton")
+modeBtn.Size = UDim2.new(1, -16, 0, 30)
+modeBtn.Position = UDim2.new(0, 8, 0, 94)
+modeBtn.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
+modeBtn.BorderSizePixel = 0
+modeBtn.Font = Enum.Font.GothamBold
+modeBtn.TextSize = 12
+modeBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
+modeBtn.Text = "Режим: Обыч"
+modeBtn.AutoButtonColor = false
+modeBtn.Parent = frame
 
-	for _, obj in ipairs(workspace:GetDescendants()) do
-		if obj:IsA("BasePart") and obj.Name == "TouchPart" then
-			if obj.Parent and obj.Parent.Name == "HardObby" then
-				return take(obj)
-			end
-		end
-	end
+local modeCorner = Instance.new("UICorner")
+modeCorner.CornerRadius = UDim.new(0, 8)
+modeCorner.Parent = modeBtn
 
-	return nil
-end
+local modeStroke = Instance.new("UIStroke")
+modeStroke.Color = Color3.fromRGB(55, 55, 65)
+modeStroke.Thickness = 1
+modeStroke.Parent = modeBtn
 
-local function getRoot()
-	local char = player.Character
-	if not char then return nil, nil end
-	local root = char:FindFirstChild("HumanoidRootPart")
-		or char:FindFirstChild("Torso")
-		or char:FindFirstChild("UpperTorso")
-		or char.PrimaryPart
-	return char, root
-end
+local hint = Instance.new("TextLabel")
+hint.Size = UDim2.new(1, -16, 0, 32)
+hint.Position = UDim2.new(0, 8, 0, 128)
+hint.BackgroundTransparency = 1
+hint.Font = Enum.Font.Gotham
+hint.TextSize = 10
+hint.TextXAlignment = Enum.TextXAlignment.Left
+hint.TextYAlignment = Enum.TextYAlignment.Top
+hint.TextColor3 = Color3.fromRGB(110, 110, 125)
+hint.Text = "Обыч — все пады  |  Последний — конец\nRightShift — скрыть"
+hint.Parent = frame
 
-local function setNoclip(on)
-	if noclipConn then
-		noclipConn:Disconnect()
-		noclipConn = nil
-	end
-	if not on then return end
-	noclipConn = RunService.Stepped:Connect(function()
-		local char = player.Character
-		if not char then return end
-		for _, p in ipairs(char:GetDescendants()) do
-			if p:IsA("BasePart") then
-				p.CanCollide = false
-			end
-		end
-	end)
-end
-
-local function fireTouch(root, part)
-	pcall(function()
-		if firetouchinterest then
-			firetouchinterest(root, part, 0)
-			firetouchinterest(root, part, 1)
-		end
-	end)
-	pcall(function()
-		if firetouchinterest then
-			firetouchinterest(part, root, 0)
-			firetouchinterest(part, root, 1)
-		end
-	end)
-	-- запасной touch через .Touched
-	pcall(function()
-		for _, side in ipairs({ root, part }) do
-			local ti = side:FindFirstChildOfClass("TouchTransmitter") or side:FindFirstChild("TouchInterest")
-			if ti then
-				-- noop, просто есть
-			end
-		end
-	end)
-end
-
-local function doTp()
-	local part = findPad(false) or findPad(true)
-	local char, root = getRoot()
-	if not part then return false, "не нашёл HardObby.TouchPart" end
-	if not char or not root then return false, "нет персонажа (зайди в игру)" end
-
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	local anim = char:FindFirstChild("Animate")
-	local cf = part.CFrame + Vector3.new(0, 3, 0)
-
-	pcall(function()
-		if anim then anim.Disabled = true end
-		if hum then
-			hum.Sit = false
-			hum.PlatformStand = false
-			hum:ChangeState(Enum.HumanoidStateType.Running)
-		end
-	end)
-
-	-- жёсткий тп
-	for _ = 1, 5 do
-		pcall(function() char:PivotTo(CFrame.new(cf.Position)) end)
-		pcall(function() root.CFrame = CFrame.new(cf.Position) end)
-		pcall(function()
-			root.AssemblyLinearVelocity = Vector3.zero
-			root.AssemblyAngularVelocity = Vector3.zero
-		end)
-	end
-
-	fireTouch(root, part)
-
-	pcall(function()
-		root.CFrame = CFrame.new(part.Position + Vector3.new(0, 3, 0))
-	end)
-
-	task.defer(function()
-		if anim and anim.Parent then
-			task.delay(0.08, function()
-				pcall(function() anim.Disabled = false end)
+-- drag
+do
+	local dragging = false
+	local dragStart, startPos
+	frame.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = frame.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
 			end)
 		end
 	end)
-
-	return true, "ok · " .. tostring(part:GetFullName())
-end
-
--- UI
-do
-	local old = playerGui:FindFirstChild("HardObbyPad")
-	if old then old:Destroy() end
-end
-
-local gui = new("ScreenGui", {
-	Name = "HardObbyPad",
-	Parent = playerGui,
-	ResetOnSpawn = false,
-	IgnoreGuiInset = true,
-	DisplayOrder = 200,
-	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-})
-
-local frame = new("Frame", {
-	Parent = gui,
-	AnchorPoint = Vector2.new(0, 0.5),
-	Position = UDim2.new(0, 16, 0.5, 0),
-	Size = UDim2.fromOffset(260, 210),
-	BackgroundColor3 = C.bg,
-	BorderSizePixel = 0,
-	Active = true,
-})
-corner(18, frame)
-stroke(C.accent, 1.6, frame, 0.65)
-
-new("TextLabel", {
-	Parent = frame,
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(16, 12),
-	Size = UDim2.fromOffset(180, 26),
-	Font = Enum.Font.GothamBlack,
-	TextSize = 20,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	TextColor3 = C.text,
-	Text = "pad",
-})
-
-new("TextLabel", {
-	Parent = frame,
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(16, 36),
-	Size = UDim2.fromOffset(220, 16),
-	Font = Enum.Font.Gotham,
-	TextSize = 11,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	TextColor3 = C.mute,
-	Text = "HardObby.TouchPart",
-})
-
-local closeBtn = new("TextButton", {
-	Parent = frame,
-	AnchorPoint = Vector2.new(1, 0),
-	Position = UDim2.new(1, -12, 0, 12),
-	Size = UDim2.fromOffset(28, 28),
-	BackgroundColor3 = C.elev,
-	Text = "✕",
-	Font = Enum.Font.GothamBold,
-	TextSize = 12,
-	TextColor3 = C.mute,
-	AutoButtonColor = false,
-})
-corner(8, closeBtn)
-
-local toggle = new("TextButton", {
-	Parent = frame,
-	Position = UDim2.fromOffset(16, 64),
-	Size = UDim2.new(1, -32, 0, 42),
-	BackgroundColor3 = C.off,
-	Text = "Выкл · авто тп",
-	Font = Enum.Font.GothamBold,
-	TextSize = 14,
-	TextColor3 = C.text,
-	AutoButtonColor = false,
-})
-corner(12, toggle)
-
-local onceBtn = new("TextButton", {
-	Parent = frame,
-	Position = UDim2.fromOffset(16, 114),
-	Size = UDim2.new(0.5, -20, 0, 36),
-	BackgroundColor3 = C.elev,
-	Text = "ТП сейчас",
-	Font = Enum.Font.GothamBold,
-	TextSize = 12,
-	TextColor3 = C.text,
-	AutoButtonColor = false,
-})
-corner(10, onceBtn)
-
-local scanBtn = new("TextButton", {
-	Parent = frame,
-	Position = UDim2.new(0.5, 4, 0, 114),
-	Size = UDim2.new(0.5, -20, 0, 36),
-	BackgroundColor3 = C.elev,
-	Text = "Найти пад",
-	Font = Enum.Font.GothamBold,
-	TextSize = 12,
-	TextColor3 = C.text,
-	AutoButtonColor = false,
-})
-corner(10, scanBtn)
-
-local status = new("TextLabel", {
-	Parent = frame,
-	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(16, 160),
-	Size = UDim2.new(1, -32, 0, 36),
-	Font = Enum.Font.Gotham,
-	TextSize = 11,
-	TextXAlignment = Enum.TextXAlignment.Left,
-	TextYAlignment = Enum.TextYAlignment.Top,
-	TextWrapped = true,
-	TextColor3 = C.mute,
-	Text = "жми «Найти пад» или Вкл",
-})
-
-local function setStatus(msg, col)
-	status.Text = tostring(msg)
-	status.TextColor3 = col or C.mute
-	print("[pad]", msg)
-end
-
-local function setEnabled(on)
-	enabled = on
-	setNoclip(on)
-	if on then
-		cached = nil
-		toggle.BackgroundColor3 = C.accent
-		toggle.TextColor3 = C.ink
-		toggle.Text = "Вкл · авто тп"
-		local p = findPad(true)
-		if p then
-			setStatus("авто · " .. p:GetFullName(), C.accent)
-		else
-			setStatus("пад не найден в Workspace", C.danger)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local d = input.Position - dragStart
+			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
 		end
-	else
-		toggle.BackgroundColor3 = C.off
-		toggle.TextColor3 = C.text
-		toggle.Text = "Выкл · авто тп"
-		setStatus("пауза", C.mute)
-	end
+	end)
 end
 
-toggle.MouseButton1Click:Connect(function()
-	setEnabled(not enabled)
-end)
-
-onceBtn.MouseButton1Click:Connect(function()
-	cached = nil
-	local ok, msg = doTp()
-	setStatus(msg, ok and C.ok or C.danger)
-end)
-
-scanBtn.MouseButton1Click:Connect(function()
-	cached = nil
-	local p = findPad(true)
-	if p then
-		setStatus("нашёл:\n" .. p:GetFullName(), C.ok)
-	else
-		-- список похожих
-		local names = {}
-		for _, obj in ipairs(workspace:GetDescendants()) do
-			if obj.Name == "TouchPart" or obj.Name == "HardObby" then
-				names[#names + 1] = obj:GetFullName()
-				if #names >= 6 then break end
-			end
-		end
-		if #names > 0 then
-			setStatus("похожее:\n" .. table.concat(names, "\n"), C.danger)
-		else
-			setStatus("в Workspace нет HardObby/TouchPart", C.danger)
-		end
-	end
-end)
-
-closeBtn.MouseButton1Click:Connect(function()
-	visible = false
-	frame.Visible = false
-end)
-
-UserInputService.InputBegan:Connect(function(input)
-	if input.KeyCode == Enum.KeyCode.RightShift then
-		visible = not visible
-		frame.Visible = visible
-	end
-end)
-
--- drag
-frame.InputBegan:Connect(function(input)
-	if input.UserInputType ~= Enum.UserInputType.MouseButton1
-		and input.UserInputType ~= Enum.UserInputType.Touch then
+UserInputService.InputBegan:Connect(function(input, gp)
+	if gp then
 		return
 	end
-	local objs = playerGui:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
-	for _, o in ipairs(objs) do
-		if o:IsA("TextButton") then return end
+	if input.KeyCode == Enum.KeyCode.RightShift then
+		frame.Visible = not frame.Visible
 	end
-	local start, origin = input.Position, frame.Position
-	local move, ended
-	move = UserInputService.InputChanged:Connect(function(ch)
-		if ch.UserInputType ~= Enum.UserInputType.MouseMovement
-			and ch.UserInputType ~= Enum.UserInputType.Touch then return end
-		local d = ch.Position - start
-		frame.Position = UDim2.new(origin.X.Scale, origin.X.Offset + d.X, origin.Y.Scale, origin.Y.Offset + d.Y)
+end)
+
+local function getHRP()
+	local char = LP.Character
+	if not char then
+		return nil
+	end
+	return char:FindFirstChild("HumanoidRootPart")
+end
+
+local function getCF(part)
+	local ok, cf = pcall(function()
+		return part:GetPivot()
 	end)
-	ended = UserInputService.InputEnded:Connect(function(e)
-		if e.UserInputType == Enum.UserInputType.MouseButton1
-			or e.UserInputType == Enum.UserInputType.Touch then
-			move:Disconnect()
-			ended:Disconnect()
+	if ok and typeof(cf) == "CFrame" then
+		return cf
+	end
+	if part:IsA("BasePart") then
+		return part.CFrame
+	end
+	local bp = part:FindFirstChildWhichIsA("BasePart", true)
+	if bp then
+		return bp.CFrame
+	end
+	return nil
+end
+
+local function getSize(part)
+	if part:IsA("BasePart") then
+		return part.Size
+	end
+	local ok, size = pcall(function()
+		return part:GetExtentsSize()
+	end)
+	if ok and typeof(size) == "Vector3" then
+		return size
+	end
+	local bp = part:FindFirstChildWhichIsA("BasePart", true)
+	if bp then
+		return bp.Size
+	end
+	return Vector3.new(4, 1, 4)
+end
+
+local function tpAbove(part)
+	local hrp = getHRP()
+	if not hrp or not part then
+		return false
+	end
+	local cf = getCF(part)
+	if not cf then
+		return false
+	end
+	local size = getSize(part)
+	local target = cf * CFrame.new(0, size.Y / 2 + TP_HEIGHT, 0)
+
+	-- просто телепорт выше пада, без обходов
+	pcall(function()
+		hrp.AssemblyLinearVelocity = Vector3.zero
+		hrp.AssemblyAngularVelocity = Vector3.zero
+	end)
+	pcall(function()
+		hrp.CFrame = target
+	end)
+	pcall(function()
+		hrp:PivotTo(target)
+	end)
+	local char = LP.Character
+	if char then
+		pcall(function()
+			char:PivotTo(target)
+		end)
+	end
+	return true
+end
+
+local function looksLikePad(inst)
+	if not inst then
+		return false
+	end
+	local n = string.lower(inst.Name)
+	if n == "touchpart" or n:find("touchpart", 1, true) or n:find("pad", 1, true) then
+		return true
+	end
+	if inst:FindFirstChild("PadRegistry") or inst:FindFirstChild("TouchInterest") then
+		return true
+	end
+	return false
+end
+
+local function findHardObby()
+	local direct = Workspace:FindFirstChild("HardObby")
+	if direct then
+		return direct
+	end
+	for _, d in ipairs(Workspace:GetDescendants()) do
+		if d.Name == "HardObby" then
+			return d
 		end
+	end
+	return nil
+end
+
+local function collectPads()
+	local pads = {}
+	local seen = {}
+
+	local function add(inst)
+		if not inst or seen[inst] then
+			return
+		end
+		if not (inst:IsA("BasePart") or inst:IsA("Model") or inst:IsA("Folder")) then
+			return
+		end
+		if not getCF(inst) then
+			return
+		end
+		seen[inst] = true
+		table.insert(pads, inst)
+	end
+
+	local hard = findHardObby()
+	if hard then
+		local tp = hard:FindFirstChild("TouchPart")
+		if tp then
+			add(tp)
+		end
+		for _, d in ipairs(hard:GetDescendants()) do
+			if looksLikePad(d) then
+				add(d)
+			end
+		end
+	end
+
+	if #pads == 0 then
+		for _, d in ipairs(Workspace:GetDescendants()) do
+			if looksLikePad(d) then
+				add(d)
+			end
+		end
+	end
+
+	table.sort(pads, function(a, b)
+		local cfa = getCF(a)
+		local cfb = getCF(b)
+		if not cfa or not cfb then
+			return false
+		end
+		if math.abs(cfa.Z - cfb.Z) > 2 then
+			return cfa.Z < cfb.Z
+		end
+		if math.abs(cfa.X - cfb.X) > 2 then
+			return cfa.X < cfb.X
+		end
+		return cfa.Y < cfb.Y
 	end)
-end)
 
--- авто тп каждый кадр
-RunService.RenderStepped:Connect(function()
-	if not enabled then return end
-	local ok, msg = doTp()
-	if not ok then
-		setStatus(msg, C.danger)
+	return pads, hard ~= nil
+end
+
+local running = false
+local mode = "normal" -- normal | last
+local loopThread = nil
+local cachedPads = {}
+local foundHard = false
+
+local function refreshStatus()
+	cachedPads, foundHard = collectPads()
+	local n = #cachedPads
+	if n == 0 then
+		status.Text = "пад не найден"
+		status.TextColor3 = Color3.fromRGB(220, 90, 90)
+	elseif mode == "last" then
+		status.Text = (foundHard and "HardObby · " or "") .. "последний из " .. n
+		status.TextColor3 = Color3.fromRGB(120, 200, 255)
 	else
-		status.TextColor3 = C.ok
-		status.Text = "тп…"
+		status.Text = (foundHard and "HardObby · " or "") .. n .. " пад(ов) · 0.1с"
+		status.TextColor3 = Color3.fromRGB(120, 200, 140)
+	end
+end
+
+local function setRunning(on)
+	running = on
+	if on then
+		toggleBtn.Text = "ВЫКЛ"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(160, 55, 55)
+	else
+		toggleBtn.Text = "ВКЛ"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(40, 120, 70)
+	end
+end
+
+local function runLoop()
+	local i = 1
+	while running do
+		refreshStatus()
+		local pads = cachedPads
+		if #pads > 0 then
+			local target
+			if mode == "last" then
+				target = pads[#pads]
+			else
+				if i > #pads then
+					i = 1
+				end
+				target = pads[i]
+				i = i + 1
+			end
+			if target then
+				tpAbove(target)
+				status.Text = (mode == "last" and "TP конец: " or "TP: ") .. target.Name
+				status.TextColor3 = Color3.fromRGB(180, 220, 255)
+			end
+		end
+		task.wait(INTERVAL)
+	end
+end
+
+toggleBtn.MouseButton1Click:Connect(function()
+	if running then
+		setRunning(false)
+		refreshStatus()
+	else
+		setRunning(true)
+		if loopThread then
+			task.cancel(loopThread)
+		end
+		loopThread = task.spawn(runLoop)
 	end
 end)
 
-player.CharacterAdded:Connect(function()
-	cached = nil
-	if enabled then
-		task.wait(0.4)
-		setNoclip(true)
+modeBtn.MouseButton1Click:Connect(function()
+	if mode == "normal" then
+		mode = "last"
+		modeBtn.Text = "Режим: Последний"
+		modeBtn.BackgroundColor3 = Color3.fromRGB(45, 55, 90)
+	else
+		mode = "normal"
+		modeBtn.Text = "Режим: Обыч"
+		modeBtn.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
+	end
+	refreshStatus()
+end)
+
+task.spawn(function()
+	while gui.Parent do
+		if not running then
+			refreshStatus()
+		end
+		task.wait(2)
 	end
 end)
 
-setStatus("жми «Найти пад»", C.mute)
-print("[pad] loaded — вставь целиком, без HttpGet")
-return gui
+Workspace.DescendantAdded:Connect(function(d)
+	if d.Name == "HardObby" or d.Name == "TouchPart" or looksLikePad(d) then
+		task.defer(refreshStatus)
+	end
+end)
+
+refreshStatus()
+print("[HardObby TP] ready · TouchPart · RightShift")
