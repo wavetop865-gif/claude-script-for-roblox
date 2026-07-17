@@ -1,5 +1,5 @@
 --[[
-	union blink — тп по всем Union по порядку, раз в 3 сек
+	union blink — тп по всем Union по порядку, раз в 1 сек
 	анимка скипается · RightShift — меню
 ]]
 
@@ -25,7 +25,7 @@ local C = {
 	ok = Color3.fromRGB(110, 210, 160),
 }
 
-local INTERVAL = 3
+local INTERVAL = 1
 local enabled = false
 local visible = true
 local lastTp = 0
@@ -269,7 +269,7 @@ local sub = new("TextLabel", {
 	TextSize = 11,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	TextColor3 = C.mute,
-	Text = "все Union по кругу · 3 сек",
+	Text = "все Union по кругу · 1 сек",
 	ZIndex = 2,
 })
 
