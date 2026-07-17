@@ -1,6 +1,6 @@
 --[[
-	union blink — тп к Union раз в 1 сек
-	режимы: обыч (по кругу) / последний
+	blink — тп к HardObby.TouchPart раз в 1 сек
+	режимы: обыч (все TouchPart в HardObby) / последний
 	анимка скипается · RightShift — меню
 ]]
 
@@ -27,12 +27,15 @@ local C = {
 }
 
 local INTERVAL = 1
+local FOLDER_NAME = "HardObby"
+local PART_NAME = "TouchPart"
+
 local enabled = false
 local visible = true
 local mode = "normal" -- normal | last
 local lastTp = 0
-local unionList = {}
-local unionIndex = 0
+local targetList = {}
+local targetIndex = 0
 
 local function new(class, props)
 	local i = Instance.new(class)
@@ -64,56 +67,71 @@ local function tween(obj, t, props)
 	return tw
 end
 
-local function collectUnions()
+local function getHardObby()
+	return workspace:FindFirstChild(FOLDER_NAME)
+		or workspace:FindFirstChild(FOLDER_NAME, true)
+end
+
+local function collectTargets()
 	local list = {}
-	for _, obj in ipairs(workspace:GetDescendants()) do
-		if obj:IsA("BasePart") and (obj.Name == "Union" or obj:IsA("UnionOperation")) then
+	local folder = getHardObby()
+	if not folder then
+		targetList = list
+		targetIndex = 0
+		return list
+	end
+
+	-- прямой дочерний TouchPart — приоритет
+	local direct = folder:FindFirstChild(PART_NAME)
+	if direct and direct:IsA("BasePart") then
+		list[#list + 1] = direct
+	end
+
+	for _, obj in ipairs(folder:GetDescendants()) do
+		if obj:IsA("BasePart") and obj.Name == PART_NAME and obj ~= direct then
 			list[#list + 1] = obj
 		end
 	end
-	table.sort(list, function(a, b)
-		return a:GetFullName() < b:GetFullName()
-	end)
-	unionList = list
-	if unionIndex > #unionList then
-		unionIndex = 0
+
+	targetList = list
+	if targetIndex > #targetList then
+		targetIndex = 0
 	end
 	return list
 end
 
-local function pruneUnions()
+local function pruneTargets()
 	local alive = {}
-	for _, p in ipairs(unionList) do
+	for _, p in ipairs(targetList) do
 		if p and p.Parent then
 			alive[#alive + 1] = p
 		end
 	end
-	unionList = alive
-	if #unionList == 0 then
-		collectUnions()
+	targetList = alive
+	if #targetList == 0 then
+		collectTargets()
 	end
-	return #unionList
+	return #targetList
 end
 
-local function pickUnion()
-	if pruneUnions() == 0 then
+local function pickTarget()
+	if pruneTargets() == 0 then
 		return nil, 0, 0
 	end
 
 	if mode == "last" then
-		unionIndex = #unionList
-		return unionList[unionIndex], unionIndex, #unionList
+		targetIndex = #targetList
+		return targetList[targetIndex], targetIndex, #targetList
 	end
 
-	-- обыч: по кругу
-	unionIndex += 1
-	if unionIndex > #unionList then
-		unionIndex = 1
-		collectUnions()
-		if #unionList == 0 then return nil, 0, 0 end
-		if unionIndex > #unionList then unionIndex = 1 end
+	targetIndex += 1
+	if targetIndex > #targetList then
+		targetIndex = 1
+		collectTargets()
+		if #targetList == 0 then return nil, 0, 0 end
+		if targetIndex > #targetList then targetIndex = 1 end
 	end
-	return unionList[unionIndex], unionIndex, #unionList
+	return targetList[targetIndex], targetIndex, #targetList
 end
 
 local function getChar()
@@ -191,9 +209,9 @@ local function teleportNoAnim(part)
 end
 
 local function doTeleport()
-	local part, idx, total = pickUnion()
+	local part, idx, total = pickTarget()
 	if not part then
-		return false, "нет Union", 0, 0
+		return false, "нет HardObby.TouchPart", 0, 0
 	end
 	local ok, msg = teleportNoAnim(part)
 	return ok, msg, idx, total
@@ -276,7 +294,7 @@ local sub = new("TextLabel", {
 	TextSize = 11,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	TextColor3 = C.mute,
-	Text = "обыч / последний · 1 сек",
+	Text = "HardObby.TouchPart · 1 сек",
 	ZIndex = 2,
 })
 
@@ -295,7 +313,6 @@ local closeBtn = new("TextButton", {
 })
 corner(8, closeBtn)
 
--- режимы
 local modeRow = new("Frame", {
 	Parent = root,
 	Position = UDim2.fromOffset(16, 58),
@@ -337,19 +354,19 @@ local function refreshModeUI()
 		modeNormal.TextColor3 = C.ink
 		modeLast.BackgroundColor3 = C.elev
 		modeLast.TextColor3 = C.mute
-		sub.Text = "по кругу · 1 сек"
+		sub.Text = "TouchPart по кругу · 1 сек"
 	else
 		modeLast.BackgroundColor3 = C.accent
 		modeLast.TextColor3 = C.ink
 		modeNormal.BackgroundColor3 = C.elev
 		modeNormal.TextColor3 = C.mute
-		sub.Text = "только последний · 1 сек"
+		sub.Text = "последний TouchPart · 1 сек"
 	end
 end
 
 modeNormal.MouseButton1Click:Connect(function()
 	mode = "normal"
-	unionIndex = 0
+	targetIndex = 0
 	refreshModeUI()
 end)
 
@@ -411,15 +428,20 @@ local function setEnabled(on)
 	enabled = on
 	if on then
 		lastTp = 0
-		unionIndex = 0
-		collectUnions()
+		targetIndex = 0
+		collectTargets()
 		toggle.BackgroundColor3 = C.accent
 		toggleLabel.Text = "Вкл"
 		toggleLabel.TextColor3 = C.ink
 		toggleStroke.Color = C.accentDim
 		tween(toggleKnob, 0.22, { Position = UDim2.new(1, -38, 0.5, 0), BackgroundColor3 = C.ink })
-		status.Text = string.format("найдено %d Union", #unionList)
-		status.TextColor3 = C.accent
+		if #targetList == 0 then
+			status.Text = "нет HardObby.TouchPart"
+			status.TextColor3 = C.danger
+		else
+			status.Text = string.format("TouchPart: %d", #targetList)
+			status.TextColor3 = C.accent
+		end
 	else
 		toggle.BackgroundColor3 = C.off
 		toggleLabel.Text = "Выкл"
@@ -489,7 +511,7 @@ RunService.Heartbeat:Connect(function()
 		if mode == "last" then
 			status.Text = string.format("последний · через %.1fs", left)
 		else
-			status.Text = string.format("%d/%d · через %.1fs", unionIndex, math.max(#unionList, 1), left)
+			status.Text = string.format("%d/%d · через %.1fs", targetIndex, math.max(#targetList, 1), left)
 		end
 		status.TextColor3 = C.mute
 		return
@@ -500,7 +522,7 @@ RunService.Heartbeat:Connect(function()
 		if mode == "last" then
 			status.Text = string.format("тп последний %d/%d", idx, total)
 		else
-			status.Text = string.format("тп %d/%d · no anim", idx, total)
+			status.Text = string.format("тп %d/%d · TouchPart", idx, total)
 		end
 		status.TextColor3 = C.ok
 		tween(mark, 0.12, { BackgroundTransparency = 0.4 })
@@ -518,6 +540,6 @@ root.BackgroundTransparency = 0.5
 root.Position = UDim2.new(0, -40, 0.5, 0)
 tween(root, 0.4, { BackgroundTransparency = 0, Position = UDim2.new(0, 18, 0.5, 0) })
 
-collectUnions()
-print("[blink] ordinary / last · RightShift — меню")
+collectTargets()
+print("[blink] HardObby.TouchPart · RightShift — меню")
 return gui
