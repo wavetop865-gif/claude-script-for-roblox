@@ -294,7 +294,7 @@ local I18N = {
 		errorParse  = "Ошибка ответа",
 		done        = "Готово",
 		chars       = "симв.",
-		hint        = "тяни края · шапку · RightShift",
+		hint        = "тяни где угодно · края · RightShift",
 		settings    = "Настройки",
 		theme       = "Тема",
 		layout      = "Интерфейс",
@@ -594,6 +594,93 @@ local function posFromSmooth()
 	return UDim2.new(dragSmooth.scale, dragSmooth.curX, dragSmooth.scale, dragSmooth.curY)
 end
 
+-- тащим окно откуда угодно, кроме кнопок / полей / ресайза
+local function isDragBlocked(obj)
+	if not obj then return true end
+	if obj:GetAttribute("ResizeEdge") then return true end
+	if obj:IsA("TextBox") or obj:IsA("TextButton") or obj:IsA("ImageButton") then
+		return true
+	end
+	-- ползунки цвета
+	if obj:GetAttribute("ColorSlider") then return true end
+	return false
+end
+
+local function startWindowDrag(input, target, onDragState)
+	if dragSmooth.frozen then return end
+	local startMouse = input.Position
+	local startPos = target.Position
+	local moving = true
+	local moveConn
+	local endConn
+
+	dragSmooth.active = true
+	dragSmooth.scale = startPos.X.Scale
+	dragSmooth.curX = startPos.X.Offset
+	dragSmooth.curY = startPos.Y.Offset
+	dragSmooth.goalX = startPos.X.Offset
+	dragSmooth.goalY = startPos.Y.Offset
+	dragSmooth.velX = 0
+	dragSmooth.velY = 0
+
+	if onDragState then onDragState(true) end
+
+	local lastMouse = startMouse
+	moveConn = UserInputService.InputChanged:Connect(function(changed)
+		if not moving then return end
+		if changed.UserInputType ~= Enum.UserInputType.MouseMovement
+			and changed.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+		local d = changed.Position - startMouse
+		dragSmooth.goalX = startPos.X.Offset + d.X
+		dragSmooth.goalY = startPos.Y.Offset + d.Y
+		local md = changed.Position - lastMouse
+		dragSmooth.velX = md.X * 60
+		dragSmooth.velY = md.Y * 60
+		lastMouse = changed.Position
+	end)
+
+	endConn = UserInputService.InputEnded:Connect(function(ended)
+		if ended.UserInputType == Enum.UserInputType.MouseButton1
+			or ended.UserInputType == Enum.UserInputType.Touch then
+			moving = false
+			dragSmooth.active = false
+			moveConn:Disconnect()
+			endConn:Disconnect()
+			if onDragState then onDragState(false) end
+		end
+	end)
+end
+
+local function bindDragAnywhere(guiRoot, target, onDragState)
+	UserInputService.InputBegan:Connect(function(input, gpe)
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1
+			and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+		if not target.Visible or dragSmooth.frozen then return end
+
+		local pos = input.Position
+		local objs = playerGui:GetGuiObjectsAtPosition(pos.X, pos.Y)
+		local hitOurs = false
+		for _, obj in ipairs(objs) do
+			if obj == guiRoot or obj:IsDescendantOf(guiRoot) then
+				hitOurs = true
+				if isDragBlocked(obj) then
+					return
+				end
+				-- первый наш объект — фон/лейбл/карточка → можно тащить
+				break
+			end
+		end
+		if hitOurs then
+			startWindowDrag(input, target, onDragState)
+		end
+	end)
+end
+
+-- старый хелпер на конкретный хэндл (шапка и т.п.)
 local function makeDraggable(handle, target, onDragState)
 	handle.Active = true
 	handle.InputBegan:Connect(function(input)
@@ -601,49 +688,15 @@ local function makeDraggable(handle, target, onDragState)
 			and input.UserInputType ~= Enum.UserInputType.Touch then
 			return
 		end
-		local startMouse = input.Position
-		local startPos = target.Position
-		local moving = true
-		local moveConn
-		local endConn
-
-		dragSmooth.active = true
-		dragSmooth.scale = startPos.X.Scale
-		dragSmooth.curX = startPos.X.Offset
-		dragSmooth.curY = startPos.Y.Offset
-		dragSmooth.goalX = startPos.X.Offset
-		dragSmooth.goalY = startPos.Y.Offset
-		dragSmooth.velX = 0
-		dragSmooth.velY = 0
-
-		if onDragState then onDragState(true) end
-
-		local lastMouse = startMouse
-		moveConn = UserInputService.InputChanged:Connect(function(changed)
-			if not moving then return end
-			if changed.UserInputType ~= Enum.UserInputType.MouseMovement
-				and changed.UserInputType ~= Enum.UserInputType.Touch then
+		-- если клик по кнопке внутри хэндла — не тащим
+		local pos = input.Position
+		local objs = playerGui:GetGuiObjectsAtPosition(pos.X, pos.Y)
+		for _, obj in ipairs(objs) do
+			if obj:IsDescendantOf(handle) and isDragBlocked(obj) then
 				return
 			end
-			local d = changed.Position - startMouse
-			dragSmooth.goalX = startPos.X.Offset + d.X
-			dragSmooth.goalY = startPos.Y.Offset + d.Y
-			local md = changed.Position - lastMouse
-			dragSmooth.velX = md.X * 60
-			dragSmooth.velY = md.Y * 60
-			lastMouse = changed.Position
-		end)
-
-		endConn = UserInputService.InputEnded:Connect(function(ended)
-			if ended.UserInputType == Enum.UserInputType.MouseButton1
-				or ended.UserInputType == Enum.UserInputType.Touch then
-				moving = false
-				dragSmooth.active = false
-				moveConn:Disconnect()
-				endConn:Disconnect()
-				if onDragState then onDragState(false) end
-			end
-		end)
+		end
+		startWindowDrag(input, target, onDragState)
 	end)
 end
 
@@ -739,6 +792,7 @@ local function makeResizeHandle(parent, target, edge, sizeState)
 	end
 
 	local handle = new("Frame", props)
+	handle:SetAttribute("ResizeEdge", edge)
 
 	local chip = new("Frame", {
 		Parent = handle,
@@ -1365,6 +1419,7 @@ end
 
 makeDraggable(header, root, onWindowDrag)
 makeDraggable(grip, root, onWindowDrag)
+bindDragAnywhere(gui, root, onWindowDrag)
 
 local brandMark = new("Frame", {
 	Parent = header,
@@ -2009,6 +2064,8 @@ local hueKnob = new("Frame", {
 })
 corner(4, hueKnob)
 stroke(Color3.fromRGB(20, 20, 24), 1, hueKnob, 0)
+hueBar:SetAttribute("ColorSlider", true)
+hueKnob:SetAttribute("ColorSlider", true)
 
 local satBar = new("Frame", {
 	Parent = colorBox,
@@ -2036,6 +2093,8 @@ local satKnob = new("Frame", {
 })
 corner(4, satKnob)
 stroke(Color3.fromRGB(20, 20, 24), 1, satKnob, 0)
+satBar:SetAttribute("ColorSlider", true)
+satKnob:SetAttribute("ColorSlider", true)
 
 local valBar = new("Frame", {
 	Parent = colorBox,
@@ -2063,6 +2122,8 @@ local valKnob = new("Frame", {
 })
 corner(4, valKnob)
 stroke(Color3.fromRGB(20, 20, 24), 1, valKnob, 0)
+valBar:SetAttribute("ColorSlider", true)
+valKnob:SetAttribute("ColorSlider", true)
 
 local accentPreview = new("Frame", {
 	Parent = colorBox,
