@@ -1,5 +1,6 @@
 --[[
-	union blink — тп по всем Union по порядку, раз в 1 сек
+	union blink — тп к Union раз в 1 сек
+	режимы: обыч (по кругу) / последний
 	анимка скипается · RightShift — меню
 ]]
 
@@ -28,6 +29,7 @@ local C = {
 local INTERVAL = 1
 local enabled = false
 local visible = true
+local mode = "normal" -- normal | last
 local lastTp = 0
 local unionList = {}
 local unionIndex = 0
@@ -70,8 +72,7 @@ local function collectUnions()
 		end
 	end
 	table.sort(list, function(a, b)
-		local pa, pb = a:GetFullName(), b:GetFullName()
-		return pa < pb
+		return a:GetFullName() < b:GetFullName()
 	end)
 	unionList = list
 	if unionIndex > #unionList then
@@ -80,8 +81,7 @@ local function collectUnions()
 	return list
 end
 
-local function nextUnion()
-	-- чистим удалённые
+local function pruneUnions()
 	local alive = {}
 	for _, p in ipairs(unionList) do
 		if p and p.Parent then
@@ -92,9 +92,20 @@ local function nextUnion()
 	if #unionList == 0 then
 		collectUnions()
 	end
-	if #unionList == 0 then
+	return #unionList
+end
+
+local function pickUnion()
+	if pruneUnions() == 0 then
 		return nil, 0, 0
 	end
+
+	if mode == "last" then
+		unionIndex = #unionList
+		return unionList[unionIndex], unionIndex, #unionList
+	end
+
+	-- обыч: по кругу
 	unionIndex += 1
 	if unionIndex > #unionList then
 		unionIndex = 1
@@ -114,7 +125,6 @@ local function getRoot(char)
 	return char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char.PrimaryPart
 end
 
--- мгновенный тп без анимации падения / ходьбы
 local function teleportNoAnim(part)
 	local char = getChar()
 	local root = getRoot(char)
@@ -127,7 +137,6 @@ local function teleportNoAnim(part)
 	local cf = part.CFrame * CFrame.new(0, part.Size.Y * 0.5 + 3, 0)
 
 	local ok = pcall(function()
-		-- глушим анимку
 		if animate then animate.Disabled = true end
 		if hum then
 			pcall(function()
@@ -151,7 +160,6 @@ local function teleportNoAnim(part)
 			root.RotVelocity = Vector3.zero
 		end)
 
-		-- на один кадр ещё раз зафиксировать (анти-интерп)
 		task.defer(function()
 			if root and root.Parent then
 				if char.PrimaryPart then
@@ -183,7 +191,7 @@ local function teleportNoAnim(part)
 end
 
 local function doTeleport()
-	local part, idx, total = nextUnion()
+	local part, idx, total = pickUnion()
 	if not part then
 		return false, "нет Union", 0, 0
 	end
@@ -191,7 +199,6 @@ local function doTeleport()
 	return ok, msg, idx, total
 end
 
--- ui
 do
 	local old = playerGui:FindFirstChild("UnionBlink")
 	if old then old:Destroy() end
@@ -211,7 +218,7 @@ local root = new("Frame", {
 	Parent = gui,
 	AnchorPoint = Vector2.new(0, 0.5),
 	Position = UDim2.new(0, 18, 0.5, 0),
-	Size = UDim2.fromOffset(232, 148),
+	Size = UDim2.fromOffset(232, 196),
 	BackgroundColor3 = C.bg,
 	BorderSizePixel = 0,
 	Active = true,
@@ -247,7 +254,7 @@ local mark = new("Frame", {
 })
 corner(3, mark)
 
-local title = new("TextLabel", {
+new("TextLabel", {
 	Parent = root,
 	BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(32, 12),
@@ -269,7 +276,7 @@ local sub = new("TextLabel", {
 	TextSize = 11,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	TextColor3 = C.mute,
-	Text = "все Union по кругу · 1 сек",
+	Text = "обыч / последний · 1 сек",
 	ZIndex = 2,
 })
 
@@ -288,9 +295,72 @@ local closeBtn = new("TextButton", {
 })
 corner(8, closeBtn)
 
+-- режимы
+local modeRow = new("Frame", {
+	Parent = root,
+	Position = UDim2.fromOffset(16, 58),
+	Size = UDim2.new(1, -32, 0, 32),
+	BackgroundTransparency = 1,
+	ZIndex = 2,
+})
+
+local modeNormal = new("TextButton", {
+	Parent = modeRow,
+	Size = UDim2.new(0.5, -4, 1, 0),
+	BackgroundColor3 = C.accent,
+	Text = "Обыч",
+	Font = Enum.Font.GothamBold,
+	TextSize = 12,
+	TextColor3 = C.ink,
+	AutoButtonColor = false,
+	ZIndex = 3,
+})
+corner(9, modeNormal)
+
+local modeLast = new("TextButton", {
+	Parent = modeRow,
+	Position = UDim2.new(0.5, 4, 0, 0),
+	Size = UDim2.new(0.5, -4, 1, 0),
+	BackgroundColor3 = C.elev,
+	Text = "Последний",
+	Font = Enum.Font.GothamBold,
+	TextSize = 12,
+	TextColor3 = C.mute,
+	AutoButtonColor = false,
+	ZIndex = 3,
+})
+corner(9, modeLast)
+
+local function refreshModeUI()
+	if mode == "normal" then
+		modeNormal.BackgroundColor3 = C.accent
+		modeNormal.TextColor3 = C.ink
+		modeLast.BackgroundColor3 = C.elev
+		modeLast.TextColor3 = C.mute
+		sub.Text = "по кругу · 1 сек"
+	else
+		modeLast.BackgroundColor3 = C.accent
+		modeLast.TextColor3 = C.ink
+		modeNormal.BackgroundColor3 = C.elev
+		modeNormal.TextColor3 = C.mute
+		sub.Text = "только последний · 1 сек"
+	end
+end
+
+modeNormal.MouseButton1Click:Connect(function()
+	mode = "normal"
+	unionIndex = 0
+	refreshModeUI()
+end)
+
+modeLast.MouseButton1Click:Connect(function()
+	mode = "last"
+	refreshModeUI()
+end)
+
 local toggle = new("TextButton", {
 	Parent = root,
-	Position = UDim2.fromOffset(16, 62),
+	Position = UDim2.fromOffset(16, 100),
 	Size = UDim2.new(1, -32, 0, 44),
 	BackgroundColor3 = C.off,
 	Text = "",
@@ -327,8 +397,8 @@ local toggleLabel = new("TextLabel", {
 local status = new("TextLabel", {
 	Parent = root,
 	BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(16, 116),
-	Size = UDim2.new(1, -32, 0, 18),
+	Position = UDim2.fromOffset(16, 156),
+	Size = UDim2.new(1, -32, 0, 24),
 	Font = Enum.Font.Gotham,
 	TextSize = 11,
 	TextXAlignment = Enum.TextXAlignment.Left,
@@ -416,14 +486,22 @@ RunService.Heartbeat:Connect(function()
 	local now = os.clock()
 	local left = INTERVAL - (now - lastTp)
 	if left > 0 then
-		status.Text = string.format("%d/%d · через %.1fs", unionIndex, math.max(#unionList, 1), left)
+		if mode == "last" then
+			status.Text = string.format("последний · через %.1fs", left)
+		else
+			status.Text = string.format("%d/%d · через %.1fs", unionIndex, math.max(#unionList, 1), left)
+		end
 		status.TextColor3 = C.mute
 		return
 	end
 	lastTp = now
 	local ok, msg, idx, total = doTeleport()
 	if ok then
-		status.Text = string.format("тп %d/%d · no anim", idx, total)
+		if mode == "last" then
+			status.Text = string.format("тп последний %d/%d", idx, total)
+		else
+			status.Text = string.format("тп %d/%d · no anim", idx, total)
+		end
 		status.TextColor3 = C.ok
 		tween(mark, 0.12, { BackgroundTransparency = 0.4 })
 		task.delay(0.15, function()
@@ -435,10 +513,11 @@ RunService.Heartbeat:Connect(function()
 	end
 end)
 
+refreshModeUI()
 root.BackgroundTransparency = 0.5
 root.Position = UDim2.new(0, -40, 0.5, 0)
 tween(root, 0.4, { BackgroundTransparency = 0, Position = UDim2.new(0, 18, 0.5, 0) })
 
 collectUnions()
-print("[blink] union loop · RightShift — меню")
+print("[blink] ordinary / last · RightShift — меню")
 return gui
